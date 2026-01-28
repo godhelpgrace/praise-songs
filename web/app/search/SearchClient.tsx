@@ -5,6 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PlayCircle, FileText, User, Disc, Mic2, Video, ListMusic, Search, ChevronLeft, ChevronRight, Heart, Download, Share2, PlusSquare } from 'lucide-react';
 
+import SongActionButtons from '@/components/SongActionButtons';
+
 type Song = {
   id: string;
   title: string;
@@ -178,24 +180,7 @@ export default function SearchClient({ songs }: Props) {
                        </td>
                        <td className="py-4 text-right pr-4">
                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                           <button onClick={(e) => handlePlay(e, song)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded border border-gray-200" title="播放">
-                             <PlayCircle size={16} />
-                           </button>
-                           <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded border border-gray-200" title="歌词">
-                             <FileText size={16} />
-                           </button>
-                           <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded border border-gray-200" title="歌谱">
-                             <ListMusic size={16} />
-                           </button>
-                           <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded border border-gray-200" title="添加到歌单">
-                             <PlusSquare size={16} />
-                           </button>
-                           <button className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded border border-gray-200" title="收藏">
-                             <Heart size={16} />
-                           </button>
-                           <button className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded border border-gray-200" title="下载">
-                             <Download size={16} />
-                           </button>
+                           <SongActionButtons song={song} />
                          </div>
                        </td>
                      </tr>

@@ -261,18 +261,18 @@ export default function SheetListClient({ initialSheets }: { initialSheets: Song
 
   return (
     <>
-      <div className="relative bg-gradient-to-r from-cyan-500 to-blue-600 rounded-3xl p-10 mb-12 shadow-xl overflow-hidden text-white">
+      <div className="relative bg-gradient-to-r from-cyan-500 to-blue-600 rounded-2xl p-6 mb-8 shadow-xl overflow-hidden text-white">
         <div className="relative z-10 max-w-2xl">
-          <h1 className="text-4xl font-bold mb-4 tracking-tight flex items-center gap-3">
-            <FileText className="w-10 h-10" />
+          <h1 className="text-2xl font-bold mb-2 tracking-tight flex items-center gap-3">
+            <FileText className="w-7 h-7" />
             歌谱资料库
           </h1>
-          <p className="text-cyan-50 text-lg mb-8 leading-relaxed">
+          <p className="text-cyan-50 text-sm mb-4 leading-relaxed">
             收录最全的赞美诗歌谱，支持在线预览与下载，方便教会与团契使用。
           </p>
           <div className="flex gap-4">
-             <Link href="/upload" className="bg-white text-blue-600 px-8 py-3 rounded-full font-bold hover:bg-blue-50 transition-colors shadow-lg flex items-center gap-2">
-               <Plus size={20} />
+             <Link href="/upload" className="bg-white text-blue-600 px-5 py-2 rounded-full font-bold hover:bg-blue-50 transition-colors shadow-lg flex items-center gap-2 text-sm">
+               <Plus size={18} />
                上传新歌谱
              </Link>
           </div>
@@ -282,13 +282,13 @@ export default function SheetListClient({ initialSheets }: { initialSheets: Song
       
       {/* Letter Navigation */}
       {letters.length > 0 && (
-        <div className="bg-white/5 p-6 rounded-2xl shadow-sm border border-white/10 mb-8 sticky top-28 z-10 backdrop-blur-xl">
-          <div className="flex flex-wrap gap-3">
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-4 sticky top-20 z-10">
+          <div className="flex flex-wrap gap-2">
             {letters.map(letter => (
               <a 
                 key={letter} 
                 href={`#letter-${letter}`}
-                className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-indigo-500 hover:text-white text-slate-300 font-bold transition-all duration-200 bg-white/5 hover:shadow-md border border-white/5"
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 hover:text-indigo-600 text-gray-700 font-bold transition-all duration-200 bg-white border border-gray-200 text-sm"
               >
                 {letter}
               </a>
@@ -298,33 +298,33 @@ export default function SheetListClient({ initialSheets }: { initialSheets: Song
       )}
       
       {Object.keys(groupedSheets).length === 0 ? (
-        <div className="text-center py-24 text-slate-400 bg-white/5 rounded-3xl shadow-sm border border-white/10">
-          <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-500">
+        <div className="text-center py-24 text-gray-400 bg-white rounded-3xl shadow-sm border border-gray-100">
+          <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6 text-gray-400">
             <FileText size={48} />
           </div>
-          <p className="text-xl font-medium mb-2 text-slate-200">暂无歌谱</p>
-          <p className="text-slate-500 mb-8">开始分享您的第一份歌谱吧</p>
+          <p className="text-xl font-medium mb-2 text-gray-800">暂无歌谱</p>
+          <p className="text-gray-500 mb-8">开始分享您的第一份歌谱吧</p>
           <Link href="/upload" className="text-white bg-indigo-600 px-8 py-3 rounded-full font-bold hover:bg-indigo-700 shadow-lg transition-all inline-block">
             去上传
           </Link>
         </div>
       ) : (
-        <div className="space-y-10">
+        <div className="space-y-4">
           {Object.entries(groupedSheets).map(([letter, group]) => (
-            <div key={letter} id={`letter-${letter}`} className="bg-white/5 rounded-3xl border border-white/10 p-8 shadow-sm scroll-mt-32 backdrop-blur-sm">
-              <h2 className="text-3xl font-bold text-white border-b border-white/10 pb-6 mb-8 flex items-center justify-between group">
-                <div className="flex items-center gap-4">
-                  <span className="bg-indigo-600 text-white w-12 h-12 flex items-center justify-center rounded-2xl shadow-lg shadow-indigo-500/30">
+            <div key={letter} id={`letter-${letter}`} className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm scroll-mt-28">
+              <h2 className="text-xl font-bold text-gray-800 border-b border-gray-100 pb-2 mb-2 flex items-center justify-between group">
+                <div className="flex items-center gap-3">
+                  <span className="bg-indigo-600 text-white w-10 h-10 flex items-center justify-center rounded-xl shadow-lg shadow-indigo-500/20 text-lg">
                     {letter}
                   </span>
-                  <span className="text-slate-400 text-lg font-normal">{group.length} 首歌曲</span>
+                  <span className="text-gray-500 text-sm font-normal">{group.length} 首歌曲</span>
                 </div>
                 <button 
                   onClick={scrollToTop}
-                  className="p-3 text-slate-400 hover:text-indigo-400 hover:bg-white/5 rounded-full transition-all"
+                  className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-gray-50 rounded-full transition-all"
                   title="返回顶部"
                 >
-                  <ArrowUp size={24} />
+                  <ArrowUp size={20} />
                 </button>
               </h2>
               
@@ -333,9 +333,9 @@ export default function SheetListClient({ initialSheets }: { initialSheets: Song
                 {group.map((song) => {
                   const isAdded = isInList(song.id);
                   return (
-                    <div key={song.id} className="flex items-center group p-3 border border-white/5 hover:border-indigo-500/30 hover:shadow-md bg-white/5 hover:bg-white/10 rounded-xl transition-all duration-300 relative">
+                    <div key={song.id} className="flex items-center group p-3 border border-gray-100 hover:border-indigo-200 hover:shadow-md bg-white hover:bg-gray-50/50 rounded-xl transition-all duration-300 relative">
                       {/* Sequence Number */}
-                      <span className="text-indigo-300 text-xs font-mono font-bold shrink-0 mr-3 w-8 text-right">
+                      <span className="text-indigo-600/40 text-xs font-mono font-bold shrink-0 mr-3 w-8 text-right">
                         {globalIndices[song.id].toString().padStart(3, '0')}
                       </span>
 
@@ -346,39 +346,39 @@ export default function SheetListClient({ initialSheets }: { initialSheets: Song
                                 <input 
                                     value={editTitle}
                                     onChange={(e) => setEditTitle(e.target.value)}
-                                    className="border border-indigo-500/50 bg-slate-800 text-white rounded px-2 py-1 text-sm flex-1 outline-none focus:ring-2 focus:ring-indigo-500/50"
+                                    className="border border-indigo-500 bg-white text-gray-800 rounded px-2 py-1 text-sm flex-1 outline-none focus:ring-2 focus:ring-indigo-500/20"
                                     autoFocus
                                 />
-                                <button onClick={() => handleSaveEdit(song.id)} className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded hover:bg-emerald-500/30 shrink-0">保存</button>
-                                <button onClick={handleCancelEdit} className="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded hover:bg-slate-600 shrink-0">取消</button>
+                                <button onClick={() => handleSaveEdit(song.id)} className="text-xs bg-emerald-50 text-emerald-600 px-2 py-1 rounded hover:bg-emerald-100 shrink-0 border border-emerald-200">保存</button>
+                                <button onClick={handleCancelEdit} className="text-xs bg-gray-50 text-gray-600 px-2 py-1 rounded hover:bg-gray-100 shrink-0 border border-gray-200">取消</button>
                             </div>
                         ) : (
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <a 
                                   href={`/api/file${song.files.sheet}`} 
                                   target="_blank"
-                                  className="text-slate-200 hover:text-indigo-400 font-bold text-base leading-snug truncate"
+                                  className="text-gray-700 hover:text-indigo-600 font-bold text-sm leading-snug truncate"
                                   title={song.title}
                                 >
                                   {song.title}
                                 </a>
                                 {song.files.sheets && song.files.sheets.length > 1 && (
-                                   <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded shrink-0">多页</span>
+                                   <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded shrink-0 border border-indigo-100">多页</span>
                                 )}
                             </div>
                         )}
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 bg-slate-800/90 backdrop-blur flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pl-2 shadow-sm rounded-l-lg border-l border-white/10">
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 backdrop-blur flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pl-2 shadow-sm rounded-l-lg border-l border-gray-100">
                           {/* Add Button */}
                           <button
                             onClick={(e) => { e.preventDefault(); togglePresentation(song); }}
                             title={isAdded ? "已加入演示列表" : "加入演示列表"}
-                            className={`w-6 h-6 flex items-center justify-center rounded-lg border transition-all duration-200 hover:scale-125 ${
+                            className={`w-6 h-6 flex items-center justify-center rounded-lg border transition-all duration-200 hover:scale-110 ${
                               isAdded 
                                 ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' 
-                                : 'bg-transparent text-slate-400 border-white/10 hover:border-indigo-500 hover:text-indigo-500'
+                                : 'bg-transparent text-gray-400 border-gray-200 hover:border-indigo-500 hover:text-indigo-500'
                             }`}
                           >
                             {isAdded ? <Check size={12} strokeWidth={3} /> : <Plus size={12} strokeWidth={3} />}
@@ -387,7 +387,7 @@ export default function SheetListClient({ initialSheets }: { initialSheets: Song
                           {song.files?.audio && (
                             <button 
                               onClick={() => handlePlay(song)}
-                              className="text-slate-400 hover:text-orange-400 w-6 h-6 flex items-center justify-center bg-transparent rounded-lg border border-white/10 hover:border-orange-500 hover:shadow-sm transition-all hover:scale-125"
+                              className="text-gray-400 hover:text-orange-500 w-6 h-6 flex items-center justify-center bg-transparent rounded-lg border border-gray-200 hover:border-orange-500 hover:shadow-sm transition-all hover:scale-110"
                               title="播放"
                             >
                               <PlayCircle size={12} />
@@ -400,7 +400,7 @@ export default function SheetListClient({ initialSheets }: { initialSheets: Song
                               <a 
                                 href={`/api/file${song.files.sheet}`} 
                                 target="_blank"
-                                className="text-slate-400 hover:text-indigo-400 w-6 h-6 flex items-center justify-center bg-transparent rounded-lg border border-white/10 hover:border-indigo-500 hover:shadow-sm transition-all hover:scale-125"
+                                className="text-gray-400 hover:text-indigo-500 w-6 h-6 flex items-center justify-center bg-transparent rounded-lg border border-gray-200 hover:border-indigo-500 hover:shadow-sm transition-all hover:scale-110"
                                 title="查看"
                               >
                                 <Eye size={12} />
@@ -411,7 +411,7 @@ export default function SheetListClient({ initialSheets }: { initialSheets: Song
                             <>
                               <button 
                                 onClick={() => handleEdit(song)}
-                                className="text-slate-400 hover:text-indigo-400 w-6 h-6 flex items-center justify-center bg-transparent rounded-lg border border-white/10 hover:border-indigo-500 hover:shadow-sm transition-all hover:scale-125"
+                                className="text-gray-400 hover:text-indigo-500 w-6 h-6 flex items-center justify-center bg-transparent rounded-lg border border-gray-200 hover:border-indigo-500 hover:shadow-sm transition-all hover:scale-110"
                                 title="编辑名称"
                               >
                                 <Edit2 size={12} />
@@ -419,7 +419,7 @@ export default function SheetListClient({ initialSheets }: { initialSheets: Song
 
                               <button 
                                 onClick={() => handleDelete(song.id)}
-                                className="text-slate-400 hover:text-rose-500 w-6 h-6 flex items-center justify-center bg-transparent rounded-lg border border-white/10 hover:border-rose-500 hover:shadow-sm transition-all hover:scale-125"
+                                className="text-gray-400 hover:text-rose-500 w-6 h-6 flex items-center justify-center bg-transparent rounded-lg border border-gray-200 hover:border-rose-500 hover:shadow-sm transition-all hover:scale-110"
                                 title="删除"
                               >
                                 <Trash2 size={12} />

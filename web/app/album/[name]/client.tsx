@@ -4,7 +4,7 @@ import { Disc, PlayCircle, ArrowLeft, Edit2, Trash2, Share2, Heart, Check, X, Ca
 import Link from 'next/link';
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import MusicListClient from '@/app/music/MusicListClient';
+import MusicListClient from '@/components/MusicListClient';
 
 type Album = {
     name: string;
@@ -273,7 +273,7 @@ export default function AlbumDetailClient({ album }: { album: Album }) {
                                 <h2 className="text-lg font-bold text-gray-800 border-l-4 border-blue-600 pl-3">音乐人其他专辑</h2>
                                 <Link href="#" className="text-xs text-gray-400 hover:text-blue-600">更多 &raquo;</Link>
                              </div>
-                             <div className="grid grid-cols-2 gap-4">
+                             <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
                                 {album.otherAlbums.map((a: any) => (
                                      <Link href={`/album/${encodeURIComponent(a.name)}`} key={a.name} className="group">
                                         <div className="aspect-square bg-gray-100 rounded overflow-hidden mb-2 relative">

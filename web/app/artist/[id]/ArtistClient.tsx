@@ -351,7 +351,7 @@ export default function ArtistClient({
            <SortBar options={['默认', '总人气', '浏览量', '收藏数', '推荐数']} showViewToggle={true} />
            
            {viewMode === 'grid' ? (
-               <div className="p-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-x-6 gap-y-8">
+               <div className="p-6 grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-x-4 gap-y-6">
                   {sortedAlbums.map(album => (
                      <Link href={`/album/${encodeURIComponent(album.name)}`} key={album.name} className="group block">
                         <div className="aspect-square bg-gray-100 rounded shadow-sm overflow-hidden mb-3 relative mx-auto border border-gray-100">
@@ -472,7 +472,7 @@ export default function ArtistClient({
     return (
         <div className="bg-white rounded shadow-sm border-t-2 border-gray-800 min-h-[500px]">
            <SortBar options={['默认', '观看次数', '收藏数']} />
-           <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-6">
+           <div className="p-6 grid grid-cols-4 md:grid-cols-6 gap-4">
               {sortedVideos.map(video => (
                  <div key={video.id} className="group cursor-pointer">
                     <div className="aspect-video bg-gray-900 rounded overflow-hidden mb-2 relative">

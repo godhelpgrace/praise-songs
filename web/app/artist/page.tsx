@@ -70,13 +70,13 @@ export default async function ArtistPage() {
     <div className="min-h-screen flex flex-col">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="relative bg-gradient-to-r from-pink-400 to-rose-500 rounded-3xl p-10 mb-12 shadow-xl overflow-hidden text-white">
+        <div className="relative bg-gradient-to-r from-pink-400 to-rose-500 rounded-2xl p-6 mb-8 shadow-xl overflow-hidden text-white">
           <div className="relative z-10 max-w-2xl">
-            <h1 className="text-4xl font-bold mb-4 tracking-tight flex items-center gap-3">
-              <User className="w-10 h-10" />
+            <h1 className="text-2xl font-bold mb-2 tracking-tight flex items-center gap-3">
+              <User className="w-7 h-7" />
               赞美诗音乐人
             </h1>
-            <p className="text-pink-50 text-lg leading-relaxed">
+            <p className="text-pink-50 text-sm leading-relaxed">
               汇聚全球优秀赞美诗创作者与敬拜团，聆听他们的生命故事与灵感分享。
             </p>
           </div>
@@ -111,7 +111,7 @@ export default async function ArtistPage() {
               <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-200 pb-2 flex items-center gap-2">
                  <span className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center text-sm">{index}</span>
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
                 {groupedArtists[index].map((artist: any) => (
                   <Link 
                     key={artist.id} 

@@ -11,6 +11,7 @@ interface SongGroup {
   title: string;
   artist: string;
   album: string;
+  category: string; // Default: 简谱
   status: UploadStatus;
   message?: string;
   files: {
@@ -56,6 +57,17 @@ export default function UploadPage() {
     setGlobalMessage(null);
   }, [activeTab]);
 
+  // Helper to detect category from filename
+  const detectCategory = (filename: string) => {
+    if (filename.includes('五线')) return '五线谱';
+    if (filename.includes('吉他')) return '吉他谱';
+    if (filename.includes('钢琴')) return '钢琴谱';
+    if (filename.includes('和弦')) return '和弦谱';
+    if (filename.includes('鼓')) return '鼓谱';
+    if (filename.includes('贝斯')) return '贝斯谱';
+    return '简谱'; // Default
+  };
+
   // Helper to group files
   const groupFiles = (files: File[], defaultArtist = '', defaultAlbum = '') => {
     const groups: Record<string, SongGroup> = {};
@@ -92,6 +104,7 @@ export default function UploadPage() {
           title: groupKey,
           artist: defaultArtist || '未分类歌手',
           album: defaultAlbum || '',
+          category: detectCategory(file.name), // Initial detection
           status: 'pending',
           files: {
             sheet: [],
@@ -101,6 +114,15 @@ export default function UploadPage() {
       }
 
       const group = groups[groupKey];
+
+      // Update category if current file provides better hint (e.g. sheet file vs audio file)
+      // If current category is default '简谱', and this file suggests something else, update it.
+      if (group.category === '简谱') {
+          const detected = detectCategory(file.name);
+          if (detected !== '简谱') {
+              group.category = detected;
+          }
+      }
 
       if (['mp3', 'm4a', 'wav', 'flac', 'aac'].includes(ext) || file.type.startsWith('audio/')) {
         // If multiple audios match the same group, we might be overwriting or should warn. 
@@ -222,6 +244,11 @@ export default function UploadPage() {
     selectedGroups.forEach(g => {
         if (g.id === primaryGroup.id) return;
         
+        // If merging a non-default category into a default one, prefer the specific one
+        if (newGroup.category === '简谱' && g.category !== '简谱') {
+            newGroup.category = g.category;
+        }
+
         // Merge Audio (Only if primary doesn't have one, or maybe warn? We stick to primary)
         if (!newGroup.files.audio && g.files.audio) {
             newGroup.files.audio = g.files.audio;
@@ -278,7 +305,7 @@ export default function UploadPage() {
     setGlobalMessage({ type: 'success', text: `已合并 ${selectedGroups.length} 个分组` });
   };
 
-  const updateGroupMetadata = (id: string, field: 'title' | 'artist' | 'album', value: string) => {
+  const updateGroupMetadata = (id: string, field: 'title' | 'artist' | 'album' | 'category', value: string) => {
     setSongGroups(prev => prev.map(g => g.id === id ? { ...g, [field]: value } : g));
   };
 
@@ -287,6 +314,7 @@ export default function UploadPage() {
     formData.append('title', group.title);
     formData.append('artist', group.artist);
     formData.append('album', group.album);
+    formData.append('category', group.category || '简谱');
     
     if (activeTab === 'album') {
         if (albumDate) formData.append('releaseDate', albumDate);
@@ -419,13 +447,13 @@ export default function UploadPage() {
       
       <main className="flex-1 py-8">
         <div className="container mx-auto px-4 max-w-5xl pb-24">
-          <div className="relative bg-gradient-to-r from-blue-500 to-indigo-600 rounded-3xl p-10 mb-8 shadow-xl overflow-hidden text-white">
+          <div className="relative bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 mb-6 shadow-xl overflow-hidden text-white">
             <div className="relative z-10 max-w-2xl">
-              <h1 className="text-4xl font-bold mb-4 tracking-tight flex items-center gap-3">
-                <Upload className="w-10 h-10" />
+              <h1 className="text-2xl font-bold mb-2 tracking-tight flex items-center gap-3">
+                <Upload className="w-7 h-7" />
                 资源上传中心
               </h1>
-              <p className="text-blue-50 text-lg leading-relaxed">
+              <p className="text-blue-50 text-sm leading-relaxed">
                 支持音频、歌谱、歌词关联上传与元数据管理，共同建设丰富的赞美诗资料库。
               </p>
             </div>
@@ -676,15 +704,29 @@ export default function UploadPage() {
                                                 <input 
                                                     value={group.artist} 
                                                     onChange={(e) => updateGroupMetadata(group.id, 'artist', e.target.value)}
-                                                    className="w-1/2 text-xs text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none"
+                                                    className="w-1/3 text-xs text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none"
                                                     placeholder="艺术家"
                                                 />
                                                 <input 
                                                     value={group.album} 
                                                     onChange={(e) => updateGroupMetadata(group.id, 'album', e.target.value)}
-                                                    className="w-1/2 text-xs text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none"
+                                                    className="w-1/3 text-xs text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none"
                                                     placeholder="专辑"
                                                 />
+                                                <select
+                                                    value={group.category}
+                                                    onChange={(e) => updateGroupMetadata(group.id, 'category', e.target.value)}
+                                                    className="w-1/3 text-xs text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none cursor-pointer"
+                                                >
+                                                    <option value="简谱">简谱</option>
+                                                    <option value="五线谱">五线谱</option>
+                                                    <option value="吉他谱">吉他谱</option>
+                                                    <option value="钢琴谱">钢琴谱</option>
+                                                    <option value="和弦谱">和弦谱</option>
+                                                    <option value="贝斯谱">贝斯谱</option>
+                                                    <option value="鼓谱">鼓谱</option>
+                                                    <option value="其他">其他</option>
+                                                </select>
                                             </div>
                                         </div>
 

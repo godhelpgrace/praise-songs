@@ -94,20 +94,20 @@ export default function PlaylistClient({
 
   return (
     <>
-      <div className="relative bg-gradient-to-r from-orange-300 to-pink-400 rounded-3xl p-10 mb-12 shadow-xl overflow-hidden text-white">
+      <div className="relative bg-gradient-to-r from-orange-300 to-pink-400 rounded-2xl p-6 mb-4 shadow-xl overflow-hidden text-white">
         <div className="relative z-10 max-w-2xl">
-          <h1 className="text-4xl font-bold mb-4 tracking-tight flex items-center gap-3">
-            <ListMusic className="w-10 h-10" />
+          <h1 className="text-2xl font-bold mb-2 tracking-tight flex items-center gap-3">
+            <ListMusic className="w-7 h-7" />
             精选歌单
           </h1>
-          <p className="text-orange-50 text-lg mb-8 leading-relaxed">
+          <p className="text-orange-50 text-sm mb-4 leading-relaxed">
             为您精心编排的音乐合辑，无论是敬拜赞美还是灵修默想，都能找到合适的旋律。
           </p>
           <button 
             onClick={() => setShowCreateModal(true)}
-            className="bg-white/90 text-orange-600 px-8 py-3 rounded-full font-bold hover:bg-white transition-colors shadow-lg flex items-center gap-2 backdrop-blur-sm"
+            className="bg-white/90 text-orange-600 px-5 py-2 rounded-full font-bold hover:bg-white transition-colors shadow-lg flex items-center gap-2 backdrop-blur-sm text-sm"
           >
-            <Plus size={20} />
+            <Plus size={18} />
             创建新歌单
           </button>
         </div>
@@ -115,7 +115,7 @@ export default function PlaylistClient({
       </div>
       
       {filteredPlaylists.length > 0 ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8">
+        <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
           {filteredPlaylists.map((playlist) => (
             <Link href={`/playlist/${playlist.id}`} key={playlist.id} className="bg-white/5 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group block transform hover:-translate-y-1 border border-white/10 hover:bg-white/10">
               <div className="aspect-square bg-white/5 flex items-center justify-center relative overflow-hidden">

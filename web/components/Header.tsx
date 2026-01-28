@@ -131,38 +131,32 @@ function HeaderContent() {
           </div>
           <Link href="/playlist" className={getLinkClass('/playlist')}>歌单</Link>
           <Link href="/sheet" className={getLinkClass('/sheet')}>歌谱</Link>
-          <Link href="/client" className={getLinkClass('/client')}>客户端</Link>
         </nav>
       </div>
       
       {/* Secondary Navigation (Always visible) */}
-      <div className="bg-[#0f172a]/60 backdrop-blur-md border-t border-white/5 py-2.5 w-full">
-        <div className="container mx-auto px-4 flex items-center gap-8 text-sm text-slate-300 font-medium">
-          {pathname.startsWith('/playlist') ? (
-             <>
-                <Link href="/playlist" className={`hover:text-white transition-colors ${pathname === '/playlist' && !currentCat ? 'text-white' : ''}`}>全部</Link>
-                {['敬拜赞美', '福音布道', '个人灵修', '节日庆典', '现代流行'].map(cat => (
-                   <Link key={cat} href={`/playlist?cat=${cat}`} className={`hover:text-white transition-colors ${currentCat === cat ? 'text-indigo-400' : ''}`}>{cat}</Link>
-                ))}
-             </>
-          ) : pathname.startsWith('/sheet') ? (
-             <>
-               <Link href="/sheet" className={`hover:text-white transition-colors ${pathname === '/sheet' && !currentCat ? 'text-white' : ''}`}>全部</Link>
-               {['五线谱', '简谱', '和弦谱', '吉他谱', '钢琴谱'].map(cat => (
-                  <Link key={cat} href={`/sheet?cat=${cat}`} className={`hover:text-white transition-colors ${currentCat === cat ? 'text-indigo-400' : ''}`}>{cat}</Link>
-               ))}
-             </>
-          ) : (
-             <>
-                <Link href="/" className={`hover:text-white transition-colors ${pathname === '/' ? 'text-white' : ''}`}>歌库</Link>
-                <Link href="/artist" className={`hover:text-white transition-colors ${pathname.startsWith('/artist') ? 'text-indigo-400' : ''}`}>音乐人</Link>
-                <Link href="/album" className={`hover:text-white transition-colors ${pathname.startsWith('/album') ? 'text-indigo-400' : ''}`}>专辑</Link>
-                <Link href="/video" className={`hover:text-white transition-colors ${pathname.startsWith('/video') ? 'text-indigo-400' : ''}`}>视频</Link>
-                <Link href="/top/today" className={`hover:text-white transition-colors ${pathname.startsWith('/top') ? 'text-indigo-400' : ''}`}>排行榜</Link>
-             </>
-          )}
+      {!pathname.startsWith('/playlist') && (
+        <div className="bg-[#0f172a]/60 backdrop-blur-md border-t border-white/5 py-2.5 w-full">
+          <div className="container mx-auto px-4 flex items-center gap-8 text-sm text-slate-300 font-medium">
+            {pathname.startsWith('/sheet') ? (
+               <>
+                 <Link href="/sheet" className={`hover:text-white transition-colors ${pathname === '/sheet' && !currentCat ? 'text-white' : ''}`}>全部</Link>
+                 {['五线谱', '简谱', '和弦谱', '吉他谱', '钢琴谱'].map(cat => (
+                    <Link key={cat} href={`/sheet?cat=${cat}`} className={`hover:text-white transition-colors ${currentCat === cat ? 'text-indigo-400' : ''}`}>{cat}</Link>
+                 ))}
+               </>
+            ) : (
+               <>
+                  <Link href="/" className={`hover:text-white transition-colors ${pathname === '/' ? 'text-white' : ''}`}>歌库</Link>
+                  <Link href="/artist" className={`hover:text-white transition-colors ${pathname.startsWith('/artist') ? 'text-indigo-400' : ''}`}>音乐人</Link>
+                  <Link href="/album" className={`hover:text-white transition-colors ${pathname.startsWith('/album') ? 'text-indigo-400' : ''}`}>专辑</Link>
+                  <Link href="/video" className={`hover:text-white transition-colors ${pathname.startsWith('/video') ? 'text-indigo-400' : ''}`}>视频</Link>
+                  <Link href="/top/today" className={`hover:text-white transition-colors ${pathname.startsWith('/top') ? 'text-indigo-400' : ''}`}>排行榜</Link>
+               </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </header>
   );
 }

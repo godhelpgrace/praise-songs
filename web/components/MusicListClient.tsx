@@ -7,6 +7,8 @@ import { PlayCircle, Clock, User, Disc, Trash2, Edit2, MoreHorizontal, Music, Pl
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
+import SongActionButtons from './SongActionButtons';
+
 type Song = {
   id: string;
   title: string;
@@ -119,15 +121,9 @@ export default function MusicListClient({
 
     if (!isActive) {
       // Case 1: New Window - Open directly with URL to preserve user gesture for Autoplay
-      const width = 1200;
-      const height = 800;
-      const left = (window.screen.availWidth - width) / 2;
-      const top = (window.screen.availHeight - height) / 2;
-      
       const playerWin = window.open(
         `/song/${song.id}`, 
-        'music_player_window', 
-        `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`
+        'music_player_window'
       );
       
       if (!playerWin) {
@@ -219,75 +215,74 @@ export default function MusicListClient({
               <th className="p-4 font-medium">歌曲标题</th>
               {!hideArtist && <th className="p-4 font-medium">歌手</th>}
               {!hideAlbum && <th className="p-4 font-medium">专辑</th>}
-              {user?.role === 'admin' && <th className="p-4 font-medium text-right pr-8">操作</th>}
+              <th className="p-4 font-medium text-right pr-8">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
             {filteredSongs.map((song, index) => (
               <tr key={song.id} className="group hover:bg-white/5 transition-colors">
-                <td className="p-4 pl-8 text-slate-500 text-sm font-mono">{index + 1}</td>
-                <td className="p-4">
+                <td className="p-2 pl-8 text-slate-500 text-xs font-mono">{index + 1}</td>
+                <td className="p-2">
                   {editingId === song.id ? (
                     <input
                       type="text"
                       value={editForm.title}
                       onChange={e => setEditForm({...editForm, title: e.target.value})}
-                      className="bg-black/20 border border-indigo-500/50 rounded px-2 py-1 text-white w-full focus:outline-none"
+                      className="bg-black/20 border border-indigo-500/50 rounded px-2 py-1 text-white w-full focus:outline-none text-xs"
                       autoFocus
                     />
                   ) : (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       <button 
                         onClick={(e) => handlePlay(e, song)}
-                        className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-all duration-300 hover:scale-110"
+                        className="w-6 h-6 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-all duration-300 hover:scale-110"
                         title="播放"
                       >
-                        <Play className="w-4 h-4 ml-0.5" />
+                        <Play className="w-3 h-3 ml-0.5" />
                       </button>
-                      <Link href={`/song/${song.id}`} className="font-bold text-black hover:text-indigo-400 transition-colors line-clamp-1 text-base">
+                      <Link href={`/song/${song.id}`} className="font-medium text-slate-700 hover:text-indigo-500 transition-colors line-clamp-1 text-sm">
                         {song.title}
                       </Link>
                     </div>
                   )}
                 </td>
                 {!hideArtist && (
-                  <td className="p-4 text-slate-400">
+                  <td className="p-2 text-slate-500 text-xs">
                     {editingId === song.id ? (
                       <input
                         type="text"
                         value={editForm.artist}
                         onChange={e => setEditForm({...editForm, artist: e.target.value})}
-                        className="bg-black/20 border border-indigo-500/50 rounded px-2 py-1 text-white w-full focus:outline-none"
+                        className="bg-black/20 border border-indigo-500/50 rounded px-2 py-1 text-white w-full focus:outline-none text-xs"
                       />
                     ) : (
-                      <div className="flex items-center gap-2">
-                         <User className="w-4 h-4 opacity-50" />
+                      <div className="flex items-center gap-1.5">
+                         <User className="w-3 h-3 opacity-50" />
                          <span>{song.artist}</span>
                       </div>
                     )}
                   </td>
                 )}
                 {!hideAlbum && (
-                  <td className="p-4 text-slate-400">
+                  <td className="p-2 text-slate-500 text-xs">
                     {editingId === song.id ? (
                       <input
                         type="text"
                         value={editForm.album}
                         onChange={e => setEditForm({...editForm, album: e.target.value})}
-                        className="bg-black/20 border border-indigo-500/50 rounded px-2 py-1 text-white w-full focus:outline-none"
+                        className="bg-black/20 border border-indigo-500/50 rounded px-2 py-1 text-white w-full focus:outline-none text-xs"
                       />
                     ) : (
-                      <div className="flex items-center gap-2">
-                        <Disc className="w-4 h-4 opacity-50" />
+                      <div className="flex items-center gap-1.5">
+                        <Disc className="w-3 h-3 opacity-50" />
                         <span>{song.album}</span>
                       </div>
                     )}
                   </td>
                 )}
-                {user?.role === 'admin' && (
-                  <td className="p-4 text-right pr-8">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {editingId === song.id ? (
+                <td className="p-2 text-right pr-8">
+                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {user?.role === 'admin' && editingId === song.id ? (
                         <>
                           <button onClick={() => saveEdit(song.id)} className="p-2 text-green-400 hover:bg-green-400/10 rounded-full transition-colors">
                             <span className="text-xs font-bold">保存</span>
@@ -296,22 +291,24 @@ export default function MusicListClient({
                             <span className="text-xs">取消</span>
                           </button>
                         </>
-                      ) : (
-                        <>
-                          <button onClick={() => startEdit(song)} className="p-2 text-indigo-400 hover:bg-indigo-400/10 rounded-full transition-colors" title="编辑">
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleDelete(song.id)} className="p-2 text-red-400 hover:bg-red-400/10 rounded-full transition-colors" title="删除">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                          <Link href={`/song/${song.id}`} className="p-2 text-slate-400 hover:bg-white/10 rounded-full transition-colors" title="详情">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Link>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                )}
+                    ) : (
+                      <>
+                        <SongActionButtons song={song} />
+                        {user?.role === 'admin' && (
+                          <>
+                            <div className="w-px h-4 bg-white/10 mx-1"></div>
+                            <button onClick={() => startEdit(song)} className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-white/10 rounded-full transition-colors" title="编辑">
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleDelete(song.id)} className="p-2 text-slate-400 hover:text-red-400 hover:bg-white/10 rounded-full transition-colors" title="删除">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
             {filteredSongs.length === 0 && (

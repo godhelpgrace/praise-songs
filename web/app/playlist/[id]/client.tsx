@@ -41,7 +41,7 @@ export default function PlaylistDetailClient({ playlist, allSongs }: Props) {
     title: playlist.title,
     creator: playlist.creator || '赞美吧编辑精选',
     description: playlist.description || '暂无',
-    tags: playlist.tags || ['布道会', '毕业典礼', '主日学', '赞美会', '现代流行']
+    tags: playlist.tags || []
   });
   const [tempMetadata, setTempMetadata] = useState(metadata);
   const [playlistSongs, setPlaylistSongs] = useState<Song[]>(playlist.songs);
@@ -239,27 +239,31 @@ export default function PlaylistDetailClient({ playlist, allSongs }: Props) {
     }));
 
     // Use iframe modal instead of window.open
-    setPlayerUrl(`/song/${song.id}`);
-    setShowPlayer(true);
+    // setPlayerUrl(`/song/${song.id}`);
+    // setShowPlayer(true);
     
-    setTimeout(() => {
-      const channel = new BroadcastChannel('music_player_channel');
-      // First play the specific song
-      channel.postMessage({ 
-        type: 'PLAY_SONG', 
-        song: {
-           id: song.id,
-           title: song.title,
-           artist: song.artist,
-           cover: song.cover || (song.files?.image ? `/api/file${song.files.image}` : undefined),
-           src: song.files?.audio ? `/api/file${song.files.audio}` : undefined,
-           lrcPath: song.files?.lrc ? `/api/file${song.files.lrc}` : undefined
-        }
-      });
-      // Then update the playlist context
-      channel.postMessage({ type: 'REPLACE_PLAYLIST', songs: playerSongs });
-      channel.close();
-    }, 2000);
+    // Check if player is active
+    if (!isActive) {
+        // Open new tab
+        window.open(`/song/${song.id}`, 'music_player_window');
+    } else {
+        const channel = new BroadcastChannel('music_player_channel');
+        // First play the specific song
+        channel.postMessage({ 
+          type: 'PLAY_SONG', 
+          song: {
+             id: song.id,
+             title: song.title,
+             artist: song.artist,
+             cover: song.cover || (song.files?.image ? `/api/file${song.files.image}` : undefined),
+             src: song.files?.audio ? `/api/file${song.files.audio}` : undefined,
+             lrcPath: song.files?.lrc ? `/api/file${song.files.lrc}` : undefined
+          }
+        });
+        // Then update the playlist context
+        channel.postMessage({ type: 'REPLACE_PLAYLIST', songs: playerSongs });
+        channel.close();
+    }
   };
 
   const handleAddToPlaylist = (song: Song) => {
@@ -451,19 +455,20 @@ export default function PlaylistDetailClient({ playlist, allSongs }: Props) {
                 )}
               </div>
               <div className="flex items-center gap-2 flex-wrap items-start pt-1">
+                 <span className="opacity-80 shrink-0 mt-1">分类：</span>
                  {isEditing ? (
                    <input 
                      type="text"
                      value={tempMetadata.tags.join(', ')}
                      onChange={(e) => setTempMetadata({...tempMetadata, tags: e.target.value.split(/,\s*/).filter(t => t.trim())})}
                      className="bg-white/20 border border-white/30 rounded px-2 py-0.5 text-sm text-white focus:bg-white/30 outline-none w-full max-w-[400px]"
-                     placeholder="使用逗号分隔标签"
+                     placeholder="输入分类，多个分类用逗号分隔"
                    />
                  ) : (
-                   <div className="flex gap-2 flex-wrap">
-                     {metadata.tags.map((tag, index) => (
+                   <div className="flex gap-2 flex-wrap mt-1">
+                     {metadata.tags && metadata.tags.length > 0 ? metadata.tags.map((tag, index) => (
                        <span key={index} className="px-2 py-0.5 bg-white/20 rounded text-xs hover:bg-white/30 cursor-pointer transition-colors">#{tag}</span>
-                     ))}
+                     )) : <span className="opacity-50 text-sm">暂无分类</span>}
                    </div>
                  )}
               </div>

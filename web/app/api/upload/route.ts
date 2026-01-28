@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
     const title = formData.get('title') as string;
     const artistName = formData.get('artist') as string;
     const albumName = formData.get('album') as string;
+    const category = formData.get('category') as string;
     const releaseDate = formData.get('releaseDate') as string;
     const description = formData.get('description') as string;
     const genre = formData.get('genre') as string;
@@ -227,6 +228,7 @@ export async function POST(request: NextRequest) {
         // Update metadata links
         existingSong.artist_id = artistId;
         if (albumId) existingSong.album_id = albumId;
+        if (category) existingSong.category = category;
 
         existingSong.updated_at = new Date().toISOString();
         
@@ -242,6 +244,7 @@ export async function POST(request: NextRequest) {
           artist_id: artistId,
           album: albumName,
           album_id: albumId || null,
+          category: category || '简谱',
           created_at: new Date().toISOString(),
           files: savedFiles
         };
