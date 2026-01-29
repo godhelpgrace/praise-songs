@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { Users, ListMusic, LayoutDashboard, Settings } from 'lucide-react';
+import { Users, ListMusic, LayoutDashboard, Settings, Database } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Toaster } from 'react-hot-toast';
@@ -65,6 +65,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   </Link>
                 );
               })}
+              
+              <a 
+                href="http://127.0.0.1:5556"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-200 cursor-pointer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Database size={18} />
+                数据管理
+              </a>
             </nav>
           </div>
         </aside>

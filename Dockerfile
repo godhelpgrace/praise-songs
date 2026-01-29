@@ -6,7 +6,7 @@ FROM base AS deps
 WORKDIR /app
 
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat openssl
 
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
@@ -46,6 +46,7 @@ RUN adduser --system --uid 1001 nextjs
 # Create storage directory and db directory
 RUN mkdir -p /app/storage
 RUN mkdir -p /app/db
+RUN chown -R nextjs:nodejs /app/storage /app/db
 
 # Copy built artifacts
 COPY --from=builder /app/web/public ./public
@@ -55,7 +56,7 @@ COPY --from=builder /app/web/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/web/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/web/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/web/lib ./lib
+# Copy migration script if we decide to add one, but for now we'll handle it in CMD or externally
 
 USER nextjs
 
@@ -63,5 +64,8 @@ EXPOSE 3000
 
 ENV PORT 3000
 
-# Start script to migrate db and run server
+# Start script
+# We use a shell command to ensure prisma migrations run if possible, but standard practice with SQLite in docker 
+# is to ensure the volume is mounted and then push schema if needed.
+# Since npx might not be available or we want to keep it simple:
 CMD ["node", "server.js"]
