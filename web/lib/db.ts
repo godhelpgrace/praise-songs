@@ -1,12 +1,14 @@
-import { promises as fs } from 'fs';
-import path from 'path';
-import Database from 'better-sqlite3';
-import bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
+import { PrismaClient } from '@prisma/client';
 
-const PROJECT_ROOT = path.resolve(process.cwd(), '..');
-const DB_JSON_PATH = path.join(PROJECT_ROOT, 'db.json');
-const SQLITE_DB_PATH = path.join(PROJECT_ROOT, 'data.db');
+// Prisma Client Setup - Forced reload
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+
+// Ensure we don't use a stale client in development
+export const prisma = globalForPrisma.prisma || new PrismaClient({
+  log: ['query', 'error', 'warn'],
+});
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 export type UserRole = 'admin' | 'user';
 
@@ -14,117 +16,84 @@ export interface User {
   id: string;
   username: string;
   password?: string; // Hashed, optional when returning to client
-  email?: string;
-  phone?: string;
+  email?: string | null;
+  phone?: string | null;
   role: UserRole;
   created_at: string;
 }
 
-export interface Database {
-  users: User[];
-  songs: any[];
-  albums: any[];
-  artists: any[];
-  playlists: any[];
-}
-
-// SQLite connection
-let sqliteDB: Database.Database | null = null;
-
-export function getSQLiteDB() {
-  if (!sqliteDB) {
-    // Ensure directory exists if needed, but PROJECT_ROOT should exist
-    sqliteDB = new Database(SQLITE_DB_PATH);
-    
-    // Initialize users table
-    sqliteDB.exec(`
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        email TEXT,
-        phone TEXT,
-        role TEXT NOT NULL DEFAULT 'user',
-        created_at TEXT
-      )
-    `);
-
-    // Seed admin user if not exists
-    const stmt = sqliteDB.prepare('SELECT * FROM users WHERE username = ?');
-    const admin = stmt.get('admin');
-    
-    if (!admin) {
-      console.log('Seeding admin user in SQLite...');
-      const hashedPassword = bcrypt.hashSync('admin123', 10);
-      const insert = sqliteDB.prepare('INSERT INTO users (id, username, password, email, phone, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-      insert.run(
-        uuidv4(), 
-        'admin', 
-        hashedPassword, 
-        'admin@example.com', 
-        '13800000000', 
-        'admin', 
-        new Date().toISOString()
-      );
-      console.log('Admin user seeded successfully.');
+export async function findUserByIdentifier(identifier: string): Promise<User | null> {
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { username: identifier },
+        { email: identifier },
+        { phone: identifier }
+      ]
     }
-  }
-  return sqliteDB;
-}
-
-export function findUserByIdentifier(identifier: string): User | undefined {
-  const db = getSQLiteDB();
-  const stmt = db.prepare('SELECT * FROM users WHERE username = ? OR email = ? OR phone = ?');
-  return stmt.get(identifier, identifier, identifier) as User | undefined;
-}
-
-export function findUserById(id: string): User | undefined {
-  const db = getSQLiteDB();
-  const stmt = db.prepare('SELECT * FROM users WHERE id = ?');
-  return stmt.get(id) as User | undefined;
-}
-
-export function checkUserConflict(username: string, email?: string, phone?: string): boolean {
-  const db = getSQLiteDB();
-  const conditions = ['username = ?'];
-  const params: any[] = [username];
+  });
   
-  if (email) {
-    conditions.push('email = ?');
-    params.push(email);
-  }
+  if (!user) return null;
   
-  if (phone) {
-    conditions.push('phone = ?');
-    params.push(phone);
-  }
-  
-  const query = `SELECT 1 FROM users WHERE ${conditions.join(' OR ')}`;
-  const stmt = db.prepare(query);
-  return !!stmt.get(...params);
+  return {
+      id: user.id,
+      username: user.username,
+      password: user.password,
+      email: user.email,
+      phone: user.phone,
+      role: user.role as UserRole,
+      created_at: user.createdAt.toISOString()
+  };
 }
 
-export function createUser(user: User): void {
-  const db = getSQLiteDB();
-  const stmt = db.prepare('INSERT INTO users (id, username, password, email, phone, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-  stmt.run(user.id, user.username, user.password, user.email || null, user.phone || null, user.role, user.created_at);
+export async function findUserById(id: string): Promise<User | null> {
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) return null;
+  
+  return {
+      id: user.id,
+      username: user.username,
+      password: user.password,
+      email: user.email,
+      phone: user.phone,
+      role: user.role as UserRole,
+      created_at: user.createdAt.toISOString()
+  };
 }
 
-// Legacy JSON DB functions for other data
-export async function getDB(): Promise<Database> {
-  try {
-    const data = await fs.readFile(DB_JSON_PATH, 'utf-8');
-    const db = JSON.parse(data);
-    if (!db.users) {
-      db.users = [];
+export async function checkUserConflict(username: string, email?: string, phone?: string): Promise<boolean> {
+  const orConditions: any[] = [{ username }];
+  if (email) orConditions.push({ email });
+  if (phone) orConditions.push({ phone });
+  
+  const count = await prisma.user.count({
+    where: {
+      OR: orConditions
     }
-    return db as Database;
-  } catch (error) {
-    console.error('Error reading DB:', error);
-    return { users: [], songs: [], albums: [], artists: [], playlists: [] };
-  }
+  });
+  return count > 0;
 }
 
-export async function saveDB(db: Database): Promise<void> {
-  await fs.writeFile(DB_JSON_PATH, JSON.stringify(db, null, 2), 'utf-8');
+export async function createUser(user: User): Promise<User> {
+  const created = await prisma.user.create({
+    data: {
+      id: user.id,
+      username: user.username,
+      password: user.password!,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      createdAt: user.created_at ? new Date(user.created_at) : undefined
+    }
+  });
+  
+  return {
+      id: created.id,
+      username: created.username,
+      password: created.password,
+      email: created.email,
+      phone: created.phone,
+      role: created.role as UserRole,
+      created_at: created.createdAt.toISOString()
+  };
 }

@@ -1,10 +1,30 @@
 import { NextResponse } from 'next/server';
+import { verifyToken } from '@/lib/auth-utils';
+import { cookies } from 'next/headers';
+import { revalidatePath } from 'next/cache';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { prisma } from '@/lib/db';
 
-const PROJECT_ROOT = path.resolve(process.cwd(), '..');
-const DB_PATH = path.join(PROJECT_ROOT, 'db.json');
-const STORAGE_ROOT = path.join(PROJECT_ROOT, 'storage');
+const STORAGE_ROOT = path.join(process.cwd(), '..', 'storage');
+
+// Helper to cleanup parent directories if empty
+async function cleanupParentDirectories(fullPath: string) {
+    try {
+        const dir = path.dirname(fullPath);
+        if (dir === STORAGE_ROOT) return; 
+
+        const files = await fs.readdir(dir);
+        if (files.length === 0) {
+            await fs.rmdir(dir);
+            if (dir.startsWith(STORAGE_ROOT) && dir !== STORAGE_ROOT) {
+                 await cleanupParentDirectories(dir);
+            }
+        }
+    } catch (e) {
+        // ignore
+    }
+}
 
 export async function DELETE(
   request: Request,
@@ -14,66 +34,76 @@ export async function DELETE(
     const { name } = await params;
     const decodedName = decodeURIComponent(name);
     
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    const db = JSON.parse(data);
+    // Find album
+    // Note: We search by name because the route is /album/[name]
+    // But ideally we should use ID.
+    // Assuming name is unique per artist, but here we just find first matching album name?
+    // Or maybe the route param is actually ID?
+    // The previous code decoded it and searched by name.
     
+    // Let's find albums with this name
+    const albums = await prisma.album.findMany({
+        where: { name: decodedName },
+        include: { songs: true }
+    });
+
+    if (albums.length === 0) {
+        // Maybe it's already deleted
+        return NextResponse.json({ success: true, count: 0 });
+    }
+
     let updatedCount = 0;
 
-    // Find the album to get its ID (if exists)
-    const albumEntry = db.albums ? db.albums.find((a: any) => a.name === decodedName) : null;
-    const albumId = albumEntry ? albumEntry.id : null;
-    
-    // Find songs belonging to this album (by name OR by ID)
-    const songsToDelete = db.songs.filter((song: any) => {
-        const nameMatch = song.album === decodedName;
-        const idMatch = albumId && song.album_id === albumId;
-        return nameMatch || idMatch;
-    });
-    
-    // Delete files for these songs
-    for (const song of songsToDelete) {
-        if (song.files) {
-            for (const key in song.files) {
-                const value = song.files[key];
-                const pathsToDelete = Array.isArray(value) ? value : [value];
-                
-                for (const relativePath of pathsToDelete) {
-                    if (relativePath) {
-                        const fullPath = path.join(STORAGE_ROOT, relativePath);
-                        try {
-                            await fs.unlink(fullPath);
-                        } catch (e) {
-                            // ignore
+    for (const album of albums) {
+        // Find songs belonging to this album
+        const songsToDelete = await prisma.song.findMany({
+            where: { albumId: album.id }
+        });
+
+        // Delete files for these songs
+        for (const song of songsToDelete) {
+            if (song.files) {
+                try {
+                    const files = JSON.parse(song.files);
+                    for (const key in files) {
+                        if (key === 'category') continue;
+                        const value = files[key];
+                        const pathsToDelete = Array.isArray(value) ? value : [value];
+                        
+                        for (const relativePath of pathsToDelete) {
+                            if (relativePath && typeof relativePath === 'string') {
+                                const fullPath = path.join(STORAGE_ROOT, relativePath.replace(/^\//, ''));
+                                try {
+                                    await fs.unlink(fullPath);
+                                    await cleanupParentDirectories(fullPath);
+                                } catch {
+                                    // ignore
+                                }
+                            }
                         }
                     }
-                }
+                } catch {}
             }
         }
+
+        // Delete songs
+        await prisma.song.deleteMany({
+            where: { albumId: album.id }
+        });
+        
+        updatedCount += songsToDelete.length;
+
+        // Delete album
+        await prisma.album.delete({
+            where: { id: album.id }
+        });
+        updatedCount++; // Count explicit album deletion
     }
 
-    // Remove songs from DB
-    const initialSongCount = db.songs.length;
-    db.songs = db.songs.filter((song: any) => {
-        const nameMatch = song.album === decodedName;
-        const idMatch = albumId && song.album_id === albumId;
-        return !nameMatch && !idMatch;
-    });
-    updatedCount += (initialSongCount - db.songs.length);
+    revalidatePath('/sheet');
+    revalidatePath('/album');
+    revalidatePath('/');
 
-    // Remove album entry from db.albums if exists
-    if (db.albums) {
-        const initialLength = db.albums.length;
-        db.albums = db.albums.filter((a: any) => a.name !== decodedName);
-        if (db.albums.length < initialLength) {
-            updatedCount++; // Count explicit album deletion
-        }
-    }
-
-    if (updatedCount === 0) {
-        // Maybe it's already deleted or doesn't exist, but we return success anyway
-    }
-
-    await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2));
     return NextResponse.json({ success: true, count: updatedCount });
   } catch (e) {
     console.error('Error deleting album:', e);
@@ -86,6 +116,12 @@ export async function PUT(
   { params }: { params: Promise<{ name: string }> }
 ) {
   try {
+    const user = await getAuthUser();
+    if (!user) return unauthorizedResponse();
+
+    const canEdit = await checkPermission(user.id, 'edit', null);
+    if (!canEdit) return forbiddenResponse('You do not have permission to edit albums');
+
     const { name } = await params;
     const decodedName = decodeURIComponent(name);
     const body = await request.json();
@@ -95,34 +131,19 @@ export async function PUT(
         return NextResponse.json({ error: 'New name is required' }, { status: 400 });
     }
 
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    const db = JSON.parse(data);
-
-    let updatedCount = 0;
-    
-    // Find the album to get its ID (if exists)
-    const albumEntry = db.albums ? db.albums.find((a: any) => a.name === decodedName) : null;
-    const albumId = albumEntry ? albumEntry.id : null;
-
-    // Update album name in db.albums
-    if (albumEntry) {
-        albumEntry.name = newName;
-    }
-
-    // Rename album for all songs (match by name OR by ID)
-    db.songs = db.songs.map((song: any) => {
-        const nameMatch = song.album === decodedName;
-        const idMatch = albumId && song.album_id === albumId;
-        
-        if (nameMatch || idMatch) {
-            updatedCount++;
-            return { ...song, album: newName };
-        }
-        return song;
+    // Update albums with this name
+    const updateResult = await prisma.album.updateMany({
+        where: { name: decodedName },
+        data: { name: newName }
     });
 
-    await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2));
-    return NextResponse.json({ success: true, count: updatedCount, newName });
+    // Also update denormalized albumName in songs
+    await prisma.song.updateMany({
+        where: { albumName: decodedName },
+        data: { albumName: newName }
+    });
+
+    return NextResponse.json({ success: true, count: updateResult.count });
   } catch (e) {
     console.error('Error updating album:', e);
     return NextResponse.json({ error: 'Failed to update album' }, { status: 500 });

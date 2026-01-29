@@ -10,7 +10,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '账号和密码不能为空' }, { status: 400 });
     }
 
-    const user = findUserByIdentifier(identifier);
+    const user = await findUserByIdentifier(identifier);
 
     if (!user || !user.password) {
       return NextResponse.json({ error: '账号或密码错误' }, { status: 401 });

@@ -1,53 +1,98 @@
 
-import { promises as fs } from 'fs';
-import path from 'path';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import Link from 'next/link';
 import ArtistClient from './ArtistClient';
-
-const PROJECT_ROOT = path.resolve(process.cwd(), '..');
-const DB_PATH = path.join(PROJECT_ROOT, 'db.json');
+import { prisma } from '@/lib/db';
 
 async function getArtist(id: string) {
   try {
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    const db = JSON.parse(data);
-    const artist = db.artists.find((a: any) => a.id === id);
-    
-    if (!artist) return null;
-
-    // Find songs by this artist
-    const songs = db.songs.filter((song: any) => 
-        song.files && 
-        song.files.audio && 
-        song.artist === artist.name
-    );
-
-    // Extract albums from songs
-    const albumsMap = new Map();
-    songs.forEach((s: any) => {
-        if (s.album && !albumsMap.has(s.album) && s.album !== '-') {
-            albumsMap.set(s.album, {
-                name: s.album,
-                cover: s.files.image,
-                date: '2023' // Placeholder
-            });
+    const artist = await (prisma as any).artist.findUnique({
+        where: { id },
+        include: {
+            songs: {
+                orderBy: { createdAt: 'desc' }
+            },
+            albums: true,
+            videos: {
+                orderBy: { createdAt: 'desc' }
+            }
         }
     });
     
-    // Also check db.albums for any albums by this artist (if we had artistId there)
-    // For now, rely on song aggregation + explicit album covers if any
-    // ...
+    if (!artist) return null;
+
+    // Process songs
+    const processedSongs = artist.songs.map((s: any) => {
+        let files: any = {};
+        try { files = JSON.parse(s.files); } catch {}
+        return {
+            id: s.id,
+            title: s.title,
+            artist: s.artistName || artist.name,
+            album: s.albumName || '-',
+            files
+        };
+    });
+
+    const processedVideos = artist.videos.map((v: any) => ({
+        id: v.id,
+        uuid: v.uuid,
+        title: v.title,
+        artistId: v.artistId,
+        artistName: v.artistName || artist.name,
+        songId: v.songId,
+        src: v.src,
+        cover: v.cover || null,
+        createdAt: v.createdAt?.toISOString ? v.createdAt.toISOString() : null
+    }));
+
+    // Extract implicit albums from songs to supplement explicit albums
+    const albumsMap = new Map();
+    
+    // 1. Add explicit albums
+    artist.albums.forEach((a: any) => {
+        albumsMap.set(a.name, {
+            name: a.name,
+            artist: artist.name,
+            cover: a.cover || '',
+            date: a.releaseDate || '2023'
+        });
+    });
+
+    // 2. Add implicit albums from songs
+    processedSongs.forEach((s: any) => {
+        if (s.album && s.album !== '-' && !albumsMap.has(s.album)) {
+            albumsMap.set(s.album, {
+                name: s.album,
+                artist: artist.name,
+                cover: s.files.image || '',
+                date: '2023'
+            });
+        }
+    });
 
     const albums = Array.from(albumsMap.values());
 
+    const songsCount = processedSongs.filter((s: any) => s.files && s.files.audio).length;
+    const sheetCount = processedSongs.filter((s: any) => s.files && (s.files.sheet || (s.files.sheets && s.files.sheets.length > 0))).length;
+    const legacyVideoCount = processedSongs.filter((s: any) => s.files && s.files.video).length;
+    const videoCount = processedVideos.length + legacyVideoCount;
+
     return {
-        ...artist,
-        songs: songs.reverse(),
-        albums
+        id: artist.id,
+        name: artist.name,
+        songs: processedSongs,
+        videos: processedVideos,
+        albums,
+        stats: {
+            songsCount,
+            sheetCount,
+            videoCount
+        }
     };
   } catch (e) {
+    console.error(e);
     return null;
   }
 }
@@ -58,9 +103,9 @@ export default async function ArtistDetailPage({ params }: { params: Promise<{ i
 
   if (!artist) {
     return (
-        <div className="min-h-screen flex flex-col">
+        <div className="min-h-screen flex flex-col bg-background">
             <Header />
-            <main className="flex-1 container mx-auto px-4 py-20 text-center text-gray-500">
+            <main className="flex-1 container mx-auto px-4 py-20 text-center text-muted-foreground">
                 音乐人不存在
             </main>
             <Footer />
@@ -69,23 +114,10 @@ export default async function ArtistDetailPage({ params }: { params: Promise<{ i
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background">
       <Header />
-      {/* Breadcrumb / Back Link */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4 py-3 text-sm text-gray-500 flex items-center gap-2">
-            <Link href="/" className="hover:text-blue-600">赞美吧</Link>
-            <span>&gt;</span>
-            <Link href="/artist" className="hover:text-blue-600">音乐人</Link>
-            <span>&gt;</span>
-            <span className="text-gray-800">{artist.name}</span>
-            <span>&gt;</span>
-            <span>主页</span>
-        </div>
-      </div>
-
-      <main className="flex-1 container mx-auto px-4 py-8">
-         <ArtistClient artist={artist} songs={artist.songs} albums={artist.albums} />
+      <main className="flex-1">
+         <ArtistClient artist={artist} songs={artist.songs} albums={artist.albums} videos={(artist as any).videos || []} />
       </main>
       <Footer />
     </div>

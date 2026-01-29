@@ -1,0 +1,149 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  email     String?
+  phone     String?
+  role      String   @default("user")
+  
+  // Password Reset
+  resetToken       String?  @map("reset_token")
+  resetTokenExpiry DateTime? @map("reset_token_expiry")
+
+  // Permissions (JSON)
+  permissions String @default("{}") 
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  playlists Playlist[] @relation("UserPlaylists")
+
+  @@map("users")
+}
+
+model Artist {
+  id        String   @id @default(uuid())
+  name      String
+  index     String?
+  
+  // Relations
+  songs     Song[]
+  albums    Album[]
+  videos    Video[]
+
+  @@map("artists")
+}
+
+model Album {
+  id          String   @id @default(uuid())
+  uuid        String?  @unique
+  name        String
+  
+  artistId    String?  @map("artist_id")
+  artist      Artist?  @relation(fields: [artistId], references: [id])
+  artistName  String?  @map("artist") // Denormalized in db.json, useful to keep?
+
+  releaseDate String?  @map("release_date")
+  description String?
+  genre       String?
+  language    String?
+  cover       String?
+  type        String?  @default("全长专辑")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  songs       Song[]
+
+  @@map("albums")
+}
+
+model Song {
+  id        String   @id @default(uuid())
+  uuid      String?  @unique
+  title     String
+  
+  artistId  String?  @map("artist_id")
+  artist    Artist?  @relation(fields: [artistId], references: [id])
+  artistName String? @map("artist") // Denormalized
+  
+  albumId   String?  @map("album_id")
+  album     Album?   @relation(fields: [albumId], references: [id])
+  albumName String?  @map("album") // Denormalized
+  
+  // Using simple Json type for files structure
+  files     String   @default("{}") 
+  
+  // Presentation settings
+  presentation String   @default("{}") // Stores SongParams JSON
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  playlists Playlist[] @relation("PlaylistSongs")
+  videos    Video[]
+
+  @@map("songs")
+}
+
+model Video {
+  id         String   @id @default(uuid())
+  uuid       String?  @unique
+  title      String
+
+  artistId   String?  @map("artist_id")
+  artist     Artist?  @relation(fields: [artistId], references: [id], onDelete: SetNull)
+  artistName String?  @map("artist")
+
+  songId     String?  @map("song_id")
+  song       Song?    @relation(fields: [songId], references: [id], onDelete: SetNull)
+
+  src        String
+  cover      String?
+
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("videos")
+}
+
+model Playlist {
+  id        String   @id @default(uuid())
+  title     String
+  description String?
+  cover     String?
+  tags      String? // Comma separated or JSON
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  creatorId String? @map("creator_id")
+  creator   User?   @relation("UserPlaylists", fields: [creatorId], references: [id])
+  status    String  @default("private") // private, pending, public
+
+  // Relations
+  songs     Song[]   @relation("PlaylistSongs")
+
+  @@map("playlists")
+}
+
+model SystemSetting {
+  key   String @id
+  value String // JSON value or string
+
+  @@map("system_settings")
+}

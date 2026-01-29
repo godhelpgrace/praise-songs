@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zanmei-web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=file:/app/db/dev.db
+      - STORAGE_PATH=/app/storage
+    volumes:
+      # Persist SQLite database
+      - ./data/db:/app/db
+      # Persist uploaded files
+      - ./data/storage:/app/storage

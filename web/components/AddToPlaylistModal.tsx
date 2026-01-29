@@ -122,38 +122,38 @@ export default function AddToPlaylistModal({ isOpen, onClose, song }: Props) {
   if (!isOpen || !song) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-        <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50/50">
-          <h3 className="font-bold text-gray-800 flex items-center gap-2">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <div className="bg-slate-900 border border-white/10 rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="flex items-center justify-between p-4 border-b border-white/10 bg-slate-800">
+          <h3 className="font-bold text-white flex items-center gap-2">
             <ListMusic className="text-indigo-500" size={20} />
             添加到歌单
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
             <X size={20} />
           </button>
         </div>
         
         <div className="p-6">
-          <div className="mb-6 bg-gray-50 p-3 rounded-lg flex items-center gap-3">
-             <div className="w-10 h-10 rounded bg-gray-200 flex items-center justify-center overflow-hidden shrink-0">
+          <div className="mb-6 bg-slate-800/50 border border-white/5 p-3 rounded-lg flex items-center gap-3">
+             <div className="w-10 h-10 rounded bg-slate-700 flex items-center justify-center overflow-hidden shrink-0">
                {song.files.image ? (
                  <img src={`/api/file${song.files.image}`} alt={song.title} className="w-full h-full object-cover" />
                ) : (
-                 <ListMusic className="text-gray-400" size={20} />
+                 <ListMusic className="text-slate-500" size={20} />
                )}
              </div>
              <div className="flex-1 min-w-0">
-               <div className="font-medium text-gray-800 truncate">{song.title}</div>
-               <div className="text-xs text-gray-500 truncate">{song.artist}</div>
+               <div className="font-medium text-white truncate">{song.title}</div>
+               <div className="text-xs text-slate-500 truncate">{song.artist}</div>
              </div>
           </div>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-600">选择歌单</label>
+              <label className="text-sm font-medium text-slate-400">选择歌单</label>
               <select 
-                className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
                 value={isCreating ? 'new' : selectedPlaylistId}
                 onChange={(e) => {
                   if (e.target.value === 'new') {
@@ -165,20 +165,20 @@ export default function AddToPlaylistModal({ isOpen, onClose, song }: Props) {
                   }
                 }}
               >
-                <option value="" disabled>请选择歌单</option>
+                <option value="" disabled className="text-slate-500">请选择歌单</option>
                 {playlists.map(p => (
-                  <option key={p.id} value={p.id}>{p.title} ({p.songs?.length || 0}首)</option>
+                  <option key={p.id} value={p.id} className="text-slate-200">{p.title} ({p.songs?.length || 0}首)</option>
                 ))}
-                <option value="new" className="font-medium text-indigo-600">+ 新建歌单</option>
+                <option value="new" className="font-medium text-indigo-400 bg-slate-800">+ 新建歌单</option>
               </select>
             </div>
 
             {isCreating && (
               <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
-                <label className="text-sm font-medium text-gray-600">歌单名称</label>
+                <label className="text-sm font-medium text-slate-400">歌单名称</label>
                 <input 
                   type="text" 
-                  className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  className="w-full bg-slate-800 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all placeholder-slate-600"
                   placeholder="输入新歌单名称"
                   value={newPlaylistName}
                   onChange={(e) => setNewPlaylistName(e.target.value)}
@@ -189,17 +189,17 @@ export default function AddToPlaylistModal({ isOpen, onClose, song }: Props) {
           </div>
         </div>
 
-        <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+        <div className="p-4 border-t border-white/10 bg-slate-800/50 flex justify-end gap-3">
           <button 
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200/50 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-slate-400 hover:bg-white/10 hover:text-white rounded-lg transition-colors"
           >
             取消
           </button>
           <button 
             onClick={isCreating ? handleCreateAndAdd : handleAddToPlaylist}
             disabled={(!isCreating && !selectedPlaylistId) || (isCreating && !newPlaylistName.trim())}
-            className="px-6 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 rounded-lg shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-6 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 rounded-lg shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isCreating ? <Plus size={16} /> : <Check size={16} />}
             {isCreating ? '创建并添加' : '添加到歌单'}

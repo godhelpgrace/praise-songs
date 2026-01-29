@@ -1,23 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFile, writeFile, unlink, rename } from 'fs/promises';
+import { getAuthUser, checkPermission, unauthorizedResponse, forbiddenResponse } from '@/lib/permission-check';
+import { unlink, rmdir, readdir } from 'fs/promises';
 import path from 'path';
+import { prisma } from '@/lib/db';
+import pinyin from 'tiny-pinyin';
+import { Prisma } from '@prisma/client';
 
 // Define project root explicitly
-const PROJECT_ROOT = path.resolve(process.cwd(), '..');
-const DB_PATH = path.join(PROJECT_ROOT, 'db.json');
-const STORAGE_ROOT = path.join(PROJECT_ROOT, 'storage');
+const STORAGE_ROOT = path.join(process.cwd(), '..', 'storage');
 
-async function getDB() {
-  try {
-    const data = await readFile(DB_PATH, 'utf-8');
-    return JSON.parse(data);
-  } catch (e) {
-    return { songs: [], albums: [] };
-  }
-}
+// Helper to cleanup parent directories if empty
+async function cleanupParentDirectories(fullPath: string) {
+    try {
+        const dir = path.dirname(fullPath);
+        if (dir === STORAGE_ROOT) return; // Don't delete root
 
-async function saveDB(data: any) {
-  await writeFile(DB_PATH, JSON.stringify(data, null, 2));
+        const files = await readdir(dir);
+        if (files.length === 0) {
+            await rmdir(dir);
+            // Recursively check parent
+            // But we might want to stop at some point (e.g. storage root)
+            // For safety, let's just do one level up or verify it's inside storage
+            if (dir.startsWith(STORAGE_ROOT) && dir !== STORAGE_ROOT) {
+                 await cleanupParentDirectories(dir); // Recurse
+            }
+        }
+    } catch (e) {
+        // Ignore errors (e.g. dir not empty, not exists)
+    }
 }
 
 export async function DELETE(
@@ -25,47 +35,129 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const db = await getDB();
-    const songIndex = db.songs.findIndex((s: any) => s.id === id);
+    const user = await getAuthUser();
+    if (!user) return unauthorizedResponse();
 
-    if (songIndex === -1) {
+    const canDelete = await checkPermission(user.id, 'delete', null);
+    if (!canDelete) return forbiddenResponse('You do not have permission to delete songs');
+
+    const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const sheetIndexStr = searchParams.get('sheetIndex');
+    const sheetIndex = sheetIndexStr ? parseInt(sheetIndexStr) : -1;
+    
+    // Find song to get files
+    const song = await prisma.song.findUnique({
+      where: { id }
+    });
+
+    if (!song) {
       return NextResponse.json({ error: 'Song not found' }, { status: 404 });
     }
 
-    const song = db.songs[songIndex];
+    // Check if we are deleting a specific sheet
+    if (sheetIndex >= 0 && song.files) {
+        try {
+            const files = JSON.parse(song.files);
+            
+            // Check if sheets array exists and index is valid
+            if (files.sheets && Array.isArray(files.sheets) && sheetIndex < files.sheets.length) {
+                const pathToDelete = files.sheets[sheetIndex];
+                
+                // Delete file from disk
+                if (pathToDelete && typeof pathToDelete === 'string') {
+                    const fullPath = path.join(STORAGE_ROOT, pathToDelete.replace(/^\//, ''));
+                    try {
+                        await unlink(fullPath);
+                        await cleanupParentDirectories(fullPath);
+                    } catch {
+                        // Ignore if file not found
+                    }
+                }
+                
+                // Remove from array
+                files.sheets.splice(sheetIndex, 1);
+                
+                // If sheets is empty, and no audio, delete the whole song
+                if (files.sheets.length === 0 && !files.audio) {
+                     await prisma.$transaction([
+                         prisma.$executeRaw`DELETE FROM "_PlaylistSongs" WHERE "B" = ${id}`,
+                         prisma.song.delete({ where: { id } })
+                     ]);
+                     return NextResponse.json({ success: true, deleted: true });
+                }
+                
+                // Sync 'sheet' property with the first item of 'sheets'
+                if (files.sheets.length > 0) {
+                    files.sheet = files.sheets[0];
+                } else {
+                    delete files.sheet;
+                }
+                
+                // Update song
+                await prisma.song.update({
+                    where: { id },
+                    data: { files: JSON.stringify(files) }
+                });
+                
+                return NextResponse.json({ success: true, updated: true });
+            }
+        } catch (e) {
+            console.error('Error parsing/modifying files:', e);
+        }
+    }
 
     // Delete files
     if (song.files) {
-      for (const key in song.files) {
-        const value = song.files[key];
-        
-        // Handle array of file paths (e.g. sheets, lrcs)
-        const pathsToDelete = Array.isArray(value) ? value : [value];
-        
-        for (const relativePath of pathsToDelete) {
-          if (relativePath) {
-            const fullPath = path.join(STORAGE_ROOT, relativePath);
-            try {
-              // Using fs.promises.unlink
-              await unlink(fullPath);
-            } catch (e) {
-              // Ignore if file not found
-              // console.warn(`Failed to delete file: ${fullPath}`, e);
+        try {
+            const files = JSON.parse(song.files);
+            for (const key in files) {
+                if (key === 'category') continue;
+
+                const value = files[key];
+                const pathsToDelete = Array.isArray(value) ? value : [value];
+                
+                for (const relativePath of pathsToDelete) {
+                    if (relativePath && typeof relativePath === 'string') {
+                        const fullPath = path.join(STORAGE_ROOT, relativePath.replace(/^\//, ''));
+                        try {
+                            await unlink(fullPath);
+                            await cleanupParentDirectories(fullPath);
+                        } catch {
+                            // Ignore if file not found
+                        }
+                    }
+                }
             }
-          }
+        } catch (e) {
+            console.error('Error parsing files:', e);
         }
-      }
     }
 
-    // Remove from DB
-    db.songs.splice(songIndex, 1);
-    await saveDB(db);
+    await prisma.$transaction([
+      prisma.$executeRaw`DELETE FROM "_PlaylistSongs" WHERE "B" = ${id}`,
+      prisma.song.delete({ where: { id } })
+    ]);
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Delete error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  } catch (error: unknown) {
+    const errorObj = (typeof error === 'object' && error !== null ? (error as Record<string, unknown>) : {}) as Record<
+      string,
+      unknown
+    >;
+    const code = typeof errorObj['code'] === 'string' ? errorObj['code'] : undefined;
+    const message =
+      typeof errorObj['message'] === 'string' ? errorObj['message'] : 'Internal Server Error';
+
+    console.error('Delete song error details:', {
+        message,
+        code,
+        meta: errorObj['meta']
+    });
+    if (code === 'P2025') {
+      return NextResponse.json({ success: true, alreadyDeleted: true });
+    }
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -74,79 +166,96 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getAuthUser();
+    if (!user) return unauthorizedResponse();
+
+    const canEdit = await checkPermission(user.id, 'edit', null);
+    if (!canEdit) return forbiddenResponse('You do not have permission to edit songs');
+
     const { id } = await params;
     const body = await request.json();
-    const db = await getDB();
-    const songIndex = db.songs.findIndex((s: any) => s.id === id);
+    
+    const song = await prisma.song.findUnique({
+      where: { id }
+    });
 
-    if (songIndex === -1) {
+    if (!song) {
       return NextResponse.json({ error: 'Song not found' }, { status: 404 });
     }
 
-    const song = db.songs[songIndex];
+    const updateData: Prisma.SongUncheckedUpdateInput = {};
+    
+    if (body.title) updateData.title = body.title;
 
-    // Handle title change and file renaming
-    if (body.title && body.title !== song.title) {
-        const oldTitle = song.title;
-        const newTitle = body.title;
-        const pathMapping = new Map<string, string>();
-        
-        if (song.files) {
-            // 1. Collect unique paths
-            const allPaths = new Set<string>();
-            const collectPaths = (obj: any) => {
-                for (const key in obj) {
-                    const val = obj[key];
-                    if (typeof val === 'string') allPaths.add(val);
-                    else if (Array.isArray(val)) val.forEach(v => typeof v === 'string' && allPaths.add(v));
-                }
-            };
-            collectPaths(song.files);
-
-            // 2. Rename files
-            for (const relPath of allPaths) {
-                // Use posix for DB paths
-                const oldName = path.posix.basename(relPath);
-                if (oldName.includes(oldTitle)) {
-                    const newName = oldName.replace(oldTitle, newTitle);
-                    if (newName !== oldName) {
-                        const dir = path.posix.dirname(relPath);
-                        const newRelPath = path.posix.join(dir, newName);
-                        
-                        const oldFullPath = path.join(STORAGE_ROOT, relPath);
-                        const newFullPath = path.join(STORAGE_ROOT, newRelPath);
-                        
-                        try {
-                            await rename(oldFullPath, newFullPath);
-                            pathMapping.set(relPath, newRelPath);
-                        } catch (e) {
-                            console.error(`Failed to rename ${relPath} to ${newRelPath}:`, e);
-                        }
-                    }
-                }
-            }
-
-            // 3. Update song.files
-            const updatePaths = (obj: any) => {
-                for (const key in obj) {
-                    const val = obj[key];
-                    if (typeof val === 'string') {
-                        if (pathMapping.has(val)) obj[key] = pathMapping.get(val);
-                    } else if (Array.isArray(val)) {
-                        obj[key] = val.map((v: string) => pathMapping.has(v) ? pathMapping.get(v) : v);
-                    }
-                }
-            };
-            updatePaths(song.files);
+    if (body.category) {
+        try {
+            const files = JSON.parse(song.files);
+            files.category = body.category;
+            updateData.files = JSON.stringify(files);
+        } catch (e) {
+            // If files is not valid JSON, we can't update category easily or reset it
         }
-        song.title = newTitle;
     }
 
-    // Update other fields
-    if (body.artist !== undefined) song.artist = body.artist;
-    if (body.album !== undefined) song.album = body.album;
+    // Handle Artist update
+    if (body.artist && body.artist !== song.artistName) {
+        // Find or create artist
+        let artist = await prisma.artist.findFirst({
+            where: { name: body.artist }
+        });
 
-    await saveDB(db);
+        if (!artist) {
+            const firstChar = body.artist.charAt(0);
+            let index = '#';
+            if (pinyin.isSupported()) {
+                 const py = pinyin.convertToPinyin(firstChar, '', true);
+                 const firstLetter = py.charAt(0).toUpperCase();
+                 if (/^[A-Z]$/.test(firstLetter)) index = firstLetter;
+            }
+            artist = await prisma.artist.create({
+                data: { name: body.artist, index }
+            });
+        }
+        updateData.artistId = artist.id;
+        updateData.artistName = body.artist;
+    }
+
+    // Handle Album update
+    if (body.album && body.album !== song.albumName) {
+        const artistId = typeof updateData.artistId === 'string' ? updateData.artistId : song.artistId;
+        const artistName = typeof updateData.artistName === 'string' ? updateData.artistName : song.artistName;
+
+        if (artistId) {
+             let album = await prisma.album.findFirst({
+                 where: { 
+                     name: body.album,
+                     artistId: artistId
+                 }
+             });
+
+             if (!album) {
+                 album = await prisma.album.create({
+                     data: {
+                         name: body.album,
+                         artistId: artistId,
+                         artistName: artistName,
+                         createdAt: new Date(),
+                         cover: '/images/default_cover.png'
+                     }
+                 });
+             }
+             updateData.albumId = album.id;
+             updateData.albumName = body.album;
+        }
+    }
+
+    if (Object.keys(updateData).length > 0) {
+        const updatedSong = await prisma.song.update({
+            where: { id },
+            data: updateData
+        });
+        return NextResponse.json({ success: true, data: updatedSong });
+    }
 
     return NextResponse.json({ success: true, data: song });
   } catch (error) {

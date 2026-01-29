@@ -1,27 +1,117 @@
 @import "tailwindcss";
 
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #0f172a; /* Slate 900 */
+  --background: #f8fafc; /* Slate 50 */
+  --foreground: #0f172a; /* Slate 900 */
+  
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  
+  --primary: #4f46e5; /* Indigo 600 */
+  --primary-foreground: #f8fafc;
+  
+  --secondary: #f1f5f9; /* Slate 100 */
+  --secondary-foreground: #0f172a;
+  
+  --muted: #f1f5f9; /* Slate 100 */
+  --muted-foreground: #64748b; /* Slate 500 */
+  
+  --accent: #f1f5f9; /* Slate 100 */
+  --accent-foreground: #0f172a;
+  
+  --destructive: #ef4444; /* Red 500 */
+  --destructive-foreground: #f8fafc;
+
+  --border: #e2e8f0; /* Slate 200 */
+  --input: #e2e8f0;
+  --ring: #4f46e5;
+  
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: #020617; /* Slate 950 */
   --foreground: #f8fafc; /* Slate 50 */
+  
+  --card: #0f172a; /* Slate 900 */
+  --card-foreground: #f8fafc;
+  
+  --popover: #0f172a;
+  --popover-foreground: #f8fafc;
+  
+  --primary: #6366f1; /* Indigo 500 */
+  --primary-foreground: #f8fafc;
+  
+  --secondary: #1e293b; /* Slate 800 */
+  --secondary-foreground: #f8fafc;
+  
+  --muted: #1e293b; /* Slate 800 */
+  --muted-foreground: #94a3b8; /* Slate 400 */
+  
+  --accent: #1e293b; /* Slate 800 */
+  --accent-foreground: #f8fafc;
+  
+  --destructive: #7f1d1d; /* Red 900 */
+  --destructive-foreground: #f8fafc;
+  
+  --border: #1e293b; /* Slate 800 */
+  --input: #1e293b;
+  --ring: #6366f1;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-/* Force dark mode colors */
-@media (prefers-color-scheme: light) {
-  :root {
-    --background: #0f172a;
-    --foreground: #f8fafc;
-  }
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: calc(var(--radius) - 1px);
+  --radius-lg: var(--radius);
 }
 
 body {
-  background: transparent;
+  background-color: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  position: relative;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* Subtle gradient background for both modes */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 15% 50%, var(--primary) 0%, transparent 25%),
+    radial-gradient(circle at 85% 30%, #8b5cf6 0%, transparent 25%);
+  opacity: 0.08; /* Low opacity for subtle effect */
+  z-index: -1;
+  pointer-events: none;
 }

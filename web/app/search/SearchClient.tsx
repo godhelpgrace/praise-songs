@@ -2,8 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { PlayCircle, FileText, User, Disc, Mic2, Video, ListMusic, Search, ChevronLeft, ChevronRight, Heart, Download, Share2, PlusSquare } from 'lucide-react';
+import { PlayCircle, FileText, ListMusic, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import SongActionButtons from '@/components/SongActionButtons';
 
@@ -27,7 +26,6 @@ type Props = {
 export default function SearchClient({ songs }: Props) {
   const searchParams = useSearchParams();
   const query = searchParams.get('q') || '';
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState('song');
 
   // Filter results
@@ -62,88 +60,33 @@ export default function SearchClient({ songs }: Props) {
     { id: 'playlist', label: '歌单', count: results?.playlists?.length || 0 },
   ];
 
-  const handlePlay = (e: React.MouseEvent, song: Song) => {
-    e.preventDefault();
-    
-    // Check if player window is active via localStorage heartbeat
-    const lastHeartbeat = parseInt(localStorage.getItem('music_player_heartbeat') || '0');
-    const isActive = localStorage.getItem('music_player_active') === 'true' && (Date.now() - lastHeartbeat < 2000);
-
-    if (!isActive) {
-      // Case 1: New Window - Open directly with URL
-      const width = 1200;
-      const height = 800;
-      const left = (window.screen.width - width) / 2;
-      const top = (window.screen.height - height) / 2;
-      
-      const playerWin = window.open(
-        `/song/${song.id}`, 
-        'music_player_window', 
-        `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`
-      );
-      
-      if (!playerWin) {
-        alert('请允许本站弹出窗口以播放音乐');
-      }
-    } else {
-      // Case 2: Existing Window - Focus and send message
-      const playerWin = window.open('', 'music_player_window');
-      if (playerWin) playerWin.focus();
-
-      // Existing window: fetch lyrics and send message
-      (async () => {
-        let lrc = undefined;
-        if (song.files.lrc) {
-          try {
-            const res = await fetch(`/api/file${song.files.lrc}`);
-            if (res.ok) lrc = await res.text();
-          } catch(e) {
-            console.error('Failed to fetch lyrics', e);
-          }
-        }
-
-        const playerSong = {
-          id: song.id,
-          title: song.title,
-          artist: song.artist,
-          cover: song.files.image ? `/api/file${song.files.image}` : undefined,
-          src: `/api/file${song.files.audio}`,
-          lrc: lrc
-        };
-
-        const channel = new BroadcastChannel('music_player_channel');
-        channel.postMessage({ type: 'PLAY_SONG', song: playerSong });
-        channel.close();
-      })();
-    }
-  };
-
   return (
-    <div className="bg-white/80 backdrop-blur-md min-h-[600px] rounded-lg shadow-sm border border-white/60 p-6">
+    <div className="bg-card/50 backdrop-blur-xl min-h-[600px] rounded-2xl border border-border p-6 shadow-xl">
       {/* Header Title */}
-      <div className="border-b border-gray-100/50 pb-4 mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">
+      <div className="border-b border-border pb-4 mb-6">
+        <h1 className="text-2xl font-bold text-foreground">
           "{query}" 的搜索结果
         </h1>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200 mb-6">
-        {tabs.map(tab => (
+      <div className="flex space-x-1 mb-8 bg-muted/50 p-1 rounded-xl w-fit overflow-x-auto max-w-full">
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-6 py-3 text-sm font-medium transition-colors relative ${
-              activeTab === tab.id 
-                ? 'text-gray-800 font-bold' 
-                : 'text-gray-500 hover:text-gray-800'
-            }`}
+            className={`
+              px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap
+              ${activeTab === tab.id
+                ? 'bg-primary text-primary-foreground shadow-lg shadow-indigo-500/20'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+              }
+            `}
           >
             {tab.label}
-            <span className="ml-1 text-gray-400">({tab.count})</span>
-            {activeTab === tab.id && (
-              <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gray-800"></div>
-            )}
+            <span className={`ml-1 text-xs ${activeTab === tab.id ? 'text-primary-foreground/80' : 'text-muted-foreground/80'}`}>
+              ({tab.count})
+            </span>
           </button>
         ))}
       </div>
@@ -153,28 +96,28 @@ export default function SearchClient({ songs }: Props) {
         {activeTab === 'song' && (
           <div>
             {results.songs.length > 0 ? (
-              <table className="w-full text-sm text-gray-600">
+              <table className="w-full text-sm text-muted-foreground">
                  <tbody>
                    {results.songs.map((song, index) => (
-                     <tr key={song.id} className="hover:bg-gray-50 border-b border-gray-100 group">
+                     <tr key={song.id} className="hover:bg-accent/50 border-b border-border group transition-colors duration-200">
                        <td className="py-4 pl-4 w-12">
-                         <input type="checkbox" className="rounded border-gray-300" />
+                         <input type="checkbox" className="rounded border-input bg-background text-primary focus:ring-primary" />
                        </td>
-                       <td className="py-4 w-12 text-gray-400 font-mono">
+                       <td className="py-4 w-12 text-muted-foreground font-mono">
                          {(index + 1).toString().padStart(2, '0')}
                        </td>
                        <td className="py-4">
                          <div className="flex items-center gap-3">
-                            <div className="font-medium text-gray-800">
-                               <span className="text-red-500 mr-1">{query}</span>
+                            <div className="font-medium text-foreground">
+                               <span className="text-primary mr-1">{query}</span>
                                {song.title.replace(query, '')}
-                               <span className="text-gray-400 mx-2">-</span>
-                               <span className="text-gray-500">《{song.title}》</span>
-                               <span className="text-gray-400 mx-2">-</span>
-                               <span className="text-gray-500">{song.artist}</span>
+                               <span className="text-muted-foreground mx-2">-</span>
+                               <span className="text-muted-foreground">《{song.title}》</span>
+                               <span className="text-muted-foreground mx-2">-</span>
+                               <span className="text-muted-foreground">{song.artist}</span>
                             </div>
                          </div>
-                         <div className="text-xs text-gray-400 mt-1">
+                         <div className="text-xs text-muted-foreground mt-1">
                            词：{song.artist} 曲：{song.artist} 编曲、后期：陈勇 出品：{song.artist}
                          </div>
                        </td>
@@ -188,28 +131,31 @@ export default function SearchClient({ songs }: Props) {
                  </tbody>
               </table>
             ) : (
-              <div className="text-center py-20 text-gray-400">没有找到相关歌曲</div>
+              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                <Search className="w-12 h-12 mb-4 opacity-20" />
+                <p>没有找到相关歌曲</p>
+              </div>
             )}
             
             {results.songs.length > 0 && (
-              <div className="flex items-center justify-between mt-8 py-4 border-t border-gray-100">
+              <div className="flex items-center justify-between mt-8 py-4 border-t border-border">
                 <div className="flex gap-2">
-                  <button className="px-3 py-1.5 border border-gray-300 text-gray-600 rounded text-sm hover:bg-gray-50">全选</button>
-                  <button className="px-3 py-1.5 border border-gray-300 text-gray-600 rounded text-sm hover:bg-gray-50">取消</button>
-                  <button className="px-3 py-1.5 border border-orange-200 bg-orange-50 text-orange-600 rounded text-sm hover:bg-orange-100 flex items-center gap-1">
+                  <button className="px-3 py-1.5 border border-border text-muted-foreground rounded text-sm hover:bg-accent transition-colors">全选</button>
+                  <button className="px-3 py-1.5 border border-border text-muted-foreground rounded text-sm hover:bg-accent transition-colors">取消</button>
+                  <button className="px-3 py-1.5 border border-primary/30 bg-primary/10 text-primary rounded text-sm hover:bg-primary/20 flex items-center gap-1 transition-colors">
                     <ListMusic size={14} /> 列表
                   </button>
-                  <button className="px-3 py-1.5 border border-orange-200 bg-orange-50 text-orange-600 rounded text-sm hover:bg-orange-100 flex items-center gap-1">
+                  <button className="px-3 py-1.5 border border-primary/30 bg-primary/10 text-primary rounded text-sm hover:bg-primary/20 flex items-center gap-1 transition-colors">
                     <PlayCircle size={14} /> 播放
                   </button>
                 </div>
                 
                 <div className="flex items-center gap-2 text-sm">
-                  <button className="px-2 py-1 border rounded hover:bg-gray-50 text-gray-500 disabled:opacity-50" disabled>
+                  <button className="px-2 py-1 border border-border rounded hover:bg-accent text-muted-foreground disabled:opacity-30 disabled:hover:bg-transparent" disabled>
                     <ChevronLeft size={16} />
                   </button>
-                  <button className="w-8 h-8 bg-orange-500 text-white rounded flex items-center justify-center">1</button>
-                  <button className="px-2 py-1 border rounded hover:bg-gray-50 text-gray-500 disabled:opacity-50" disabled>
+                  <button className="w-8 h-8 bg-primary text-primary-foreground rounded flex items-center justify-center shadow-lg shadow-indigo-500/20">1</button>
+                  <button className="px-2 py-1 border border-border rounded hover:bg-accent text-muted-foreground disabled:opacity-30 disabled:hover:bg-transparent" disabled>
                     <ChevronRight size={16} />
                   </button>
                 </div>
@@ -223,25 +169,34 @@ export default function SearchClient({ songs }: Props) {
              {results.sheets.length > 0 ? (
                <div className="grid grid-cols-4 gap-6">
                  {results.sheets.map(song => (
-                   <div key={song.id} className="border border-gray-200 rounded p-4 hover:shadow-md transition-shadow">
-                     <div className="h-32 bg-gray-100 mb-3 flex items-center justify-center text-gray-400">
+                   <div key={song.id} className="border border-border bg-card/50 rounded-xl p-4 hover:bg-accent/50 transition-all duration-200 group">
+                     <div className="h-32 bg-muted/50 rounded-lg mb-3 flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors">
                        <FileText size={32} />
                      </div>
-                     <h3 className="font-bold text-gray-800 truncate">{song.title}</h3>
-                     <p className="text-xs text-gray-500">{song.artist}</p>
-                     <a href={`/api/file${song.files.sheet}`} target="_blank" className="text-blue-600 text-xs mt-2 inline-block hover:underline">查看歌谱</a>
+                     <h3 className="font-bold text-foreground truncate">{song.title}</h3>
+                     <p className="text-xs text-muted-foreground">{song.artist}</p>
+                     {song.files.sheet && (
+                       <a href={`/api/file${song.files.sheet}`} target="_blank" className="text-primary text-xs mt-2 inline-block hover:text-primary/80 hover:underline">查看歌谱</a>
+                     )}
                    </div>
                  ))}
                </div>
              ) : (
-               <div className="text-center py-20 text-gray-400">没有找到相关歌谱</div>
+               <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                 <FileText className="w-12 h-12 mb-4 opacity-20" />
+                 <p>没有找到相关歌谱</p>
+               </div>
              )}
           </div>
         )}
 
         {['artist', 'album', 'mv', 'lyric', 'playlist'].includes(activeTab) && (
-          <div className="text-center py-20 text-gray-400">
-            功能开发中...
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground border-2 border-dashed border-border rounded-2xl bg-muted/20">
+            <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+              <Search className="w-8 h-8 opacity-40" />
+            </div>
+            <p className="text-lg font-medium text-muted-foreground">暂无相关内容</p>
+            <p className="text-sm opacity-60 mt-2">该分类下还没有搜索结果</p>
           </div>
         )}
       </div>

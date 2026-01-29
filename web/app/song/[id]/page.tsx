@@ -1,24 +1,36 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import SongDetailClient from './client';
+import { prisma } from '@/lib/db';
 
 // Define project root explicitly
-const PROJECT_ROOT = path.resolve(process.cwd(), '..');
-const DB_PATH = path.join(PROJECT_ROOT, 'db.json');
-const STORAGE_ROOT = path.join(PROJECT_ROOT, 'storage');
+// In Next.js server components, process.cwd() is the project root (web folder)
+const STORAGE_ROOT = path.join(process.cwd(), '..', 'storage');
 
 async function getSong(id: string) {
   try {
-    try {
-      await fs.access(DB_PATH);
-    } catch {
-      return null;
-    }
+    const song = await prisma.song.findUnique({
+      where: { id },
+      include: {
+        artist: true,
+        album: true
+      }
+    });
+    
+    if (!song) return null;
 
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    const db = JSON.parse(data);
-    return db.songs.find((s: any) => s.id === id) || null;
+    // Parse files JSON
+    let files = {};
+    try {
+        files = JSON.parse(song.files);
+    } catch (e) {}
+
+    return {
+        ...song,
+        files
+    };
   } catch (e) {
+    console.error("Error fetching song:", e);
     return null;
   }
 }
@@ -32,10 +44,14 @@ export default async function SongPage({ params }: { params: Promise<{ id: strin
   }
 
   let lrcContent = '';
-  if (song.files && song.files.lrc) {
+  // song.files is now an object because we parsed it in getSong
+  const files = song.files as any;
+  
+  if (files && files.lrc) {
     try {
-      const relativePath = song.files.lrc.replace(/^\//, '');
+      const relativePath = files.lrc.replace(/^\//, '');
       const lrcPath = path.join(STORAGE_ROOT, relativePath);
+      // Check if file exists
       await fs.access(lrcPath);
       lrcContent = await fs.readFile(lrcPath, 'utf-8');
     } catch (e) {

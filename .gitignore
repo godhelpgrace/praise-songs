@@ -4,3 +4,8 @@ node_modules
 .vercel
 *.log
 data.db
+data/
+storage/
+web/.env
+web/.next/
+web/node_modules/

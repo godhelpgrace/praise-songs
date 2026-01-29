@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { prisma } from '@/lib/db';
 
-const PROJECT_ROOT = path.resolve(process.cwd(), '..');
-const DB_PATH = path.join(PROJECT_ROOT, 'db.json');
-const STORAGE_ROOT = path.join(PROJECT_ROOT, 'storage');
+const STORAGE_ROOT = path.join(process.cwd(), '..', 'storage');
 
 export async function POST(
   request: NextRequest,
@@ -36,35 +35,36 @@ export async function POST(
     const publicPath = `/images/albums/${fileName}`;
 
     // Update DB
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    const db = JSON.parse(data);
-    if (!db.albums) db.albums = [];
-
-    let album = db.albums.find((a: any) => a.name === albumName);
+    // Find album by name
+    let album = await prisma.album.findFirst({
+        where: { name: albumName }
+    });
     
     if (album) {
-        album.cover = publicPath;
+        await prisma.album.update({
+            where: { id: album.id },
+            data: { cover: publicPath }
+        });
     } else {
         // Create new album entry if not exists
         // We need to find artist from songs to populate artist info if possible
-        const song = db.songs.find((s: any) => s.album === albumName);
-        const artist = song ? song.artist : '未知歌手';
-        const artistId = song ? song.artist_id : '';
+        const song = await prisma.song.findFirst({
+            where: { albumName: albumName }
+        });
+        
+        const artistName = song ? song.artistName : '未知歌手';
+        const artistId = song ? song.artistId : null;
 
-        album = {
-            id: Date.now().toString(),
-            uuid: uuidv4().replace(/-/g, '').substring(0, 24),
-            name: albumName,
-            artist: artist,
-            artist_id: artistId,
-            cover: publicPath,
-            songs: [],
-            created_at: new Date().toISOString()
-        };
-        db.albums.push(album);
+        album = await prisma.album.create({
+            data: {
+                name: albumName,
+                artistName: artistName || '未知歌手',
+                artistId: artistId,
+                cover: publicPath,
+                createdAt: new Date()
+            }
+        });
     }
-
-    await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2));
 
     return NextResponse.json({ success: true, cover: publicPath });
   } catch (e) {

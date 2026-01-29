@@ -1,25 +1,34 @@
-import { promises as fs } from 'fs';
-import path from 'path';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import SearchClient from './SearchClient';
 import { Suspense } from 'react';
-
-// Define project root explicitly
-const PROJECT_ROOT = path.resolve(process.cwd(), '..');
-const DB_PATH = path.join(PROJECT_ROOT, 'db.json');
+import { prisma } from '@/lib/db';
 
 async function getSongs() {
   try {
-    try {
-      await fs.access(DB_PATH);
-    } catch {
-      return [];
-    }
+    const songs = await prisma.song.findMany({
+      include: {
+        artist: true,
+        album: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+    return songs.map((s: any) => {
+      let files = {};
+      try {
+        files = JSON.parse(s.files);
+      } catch {}
 
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    const db = JSON.parse(data);
-    return db.songs || [];
+      return {
+        id: s.id,
+        title: s.title,
+        artist: s.artistName || s.artist?.name || '未知歌手',
+        album: s.albumName || s.album?.name || '-',
+        files
+      };
+    });
   } catch (e) {
     console.error('Error reading songs list:', e);
     return [];
@@ -30,10 +39,10 @@ export default async function SearchPage() {
   const songs = await getSongs();
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background transition-colors duration-300">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
-        <Suspense fallback={<div>Loading...</div>}>
+        <Suspense fallback={<div className="text-slate-500 dark:text-slate-400 text-center py-20">Loading...</div>}>
           <SearchClient songs={songs} />
         </Suspense>
       </main>

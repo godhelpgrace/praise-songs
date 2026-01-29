@@ -4,8 +4,7 @@ import path from 'path';
 import mime from 'mime';
 
 // Define storage root consistently
-const PROJECT_ROOT = path.resolve(process.cwd(), '..');
-const STORAGE_ROOT = path.join(PROJECT_ROOT, 'storage');
+const STORAGE_ROOT = process.env.STORAGE_PATH || path.resolve(process.cwd(), '..', 'storage');
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   try {

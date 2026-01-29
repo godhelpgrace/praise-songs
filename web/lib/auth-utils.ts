@@ -23,3 +23,36 @@ export function verifyToken(token: string): any {
     return null;
   }
 }
+
+// Default permissions for new users
+export const DEFAULT_PERMISSIONS = {
+  upload: true,
+  edit: true,
+  delete: 'self', // 'all', 'self', 'none'
+  download: true,
+  view_private: false, // can view private playlists of others? No.
+  admin_panel: false
+};
+
+// Admin permissions
+export const ADMIN_PERMISSIONS = {
+  upload: true,
+  edit: true,
+  delete: 'all',
+  download: true,
+  view_private: true,
+  admin_panel: true
+};
+
+export function getUserPermissions(role: string, customPermissions: string | object): any {
+  let base = role === 'admin' ? ADMIN_PERMISSIONS : DEFAULT_PERMISSIONS;
+  
+  if (!customPermissions || customPermissions === '{}') return base;
+  
+  try {
+    const custom = typeof customPermissions === 'string' ? JSON.parse(customPermissions) : customPermissions;
+    return { ...base, ...custom };
+  } catch (e) {
+    return base;
+  }
+}

@@ -33,7 +33,7 @@ export default function SongActionButtons({ song, className = '' }: Props) {
     
     // Check if player window is active via localStorage heartbeat
     const lastHeartbeat = parseInt(localStorage.getItem('music_player_heartbeat') || '0');
-    const isActive = localStorage.getItem('music_player_active') === 'true' && (Date.now() - lastHeartbeat < 2000);
+    const isActive = localStorage.getItem('music_player_active') === 'true' && (Date.now() - lastHeartbeat < 5000);
 
     if (!isActive) {
       // Case 1: New Window - Open directly with URL
@@ -96,7 +96,7 @@ export default function SongActionButtons({ song, className = '' }: Props) {
     
     // Check if player window is active via localStorage heartbeat
     const lastHeartbeat = parseInt(localStorage.getItem('music_player_heartbeat') || '0');
-    const isActive = localStorage.getItem('music_player_active') === 'true' && (Date.now() - lastHeartbeat < 2000);
+    const isActive = localStorage.getItem('music_player_active') === 'true' && (Date.now() - lastHeartbeat < 5000);
 
     if (!isActive) {
        // If player not active, open it and play
@@ -121,7 +121,14 @@ export default function SongActionButtons({ song, className = '' }: Props) {
     channel.close();
     
     // Show simple feedback
-    // alert('已添加到播放列表');
+    const toast = document.createElement('div');
+    toast.textContent = '已添加到播放列表';
+    toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-full text-sm z-[9999] animate-in fade-in slide-in-from-top-2 duration-200';
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('fade-out', 'slide-out-to-top-2');
+        setTimeout(() => toast.remove(), 200);
+    }, 2000);
   };
 
   const toggleLike = (e: React.MouseEvent) => {
@@ -141,42 +148,42 @@ export default function SongActionButtons({ song, className = '' }: Props) {
       <div className={`flex items-center gap-1 ${className}`}>
         <button 
           onClick={handlePlay} 
-          className="p-1.5 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded border border-transparent hover:border-indigo-100 transition-all" 
+          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-all" 
           title="播放"
         >
           <PlayCircle size={16} />
         </button>
         <button 
           onClick={handleAddToQueue} 
-          className="p-1.5 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded border border-transparent hover:border-indigo-100 transition-all" 
+          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-all" 
           title="添加到播放列表"
         >
           <ListPlus size={16} />
         </button>
         <button 
           onClick={handleDownload} 
-          className="p-1.5 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded border border-transparent hover:border-indigo-100 transition-all" 
+          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-all" 
           title="下载"
         >
           <Download size={16} />
         </button>
         <button 
           onClick={(e) => { e.stopPropagation(); setShowPlaylistModal(true); }} 
-          className="p-1.5 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded border border-transparent hover:border-indigo-100 transition-all" 
+          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-all" 
           title="添加到歌单"
         >
           <PlusSquare size={16} />
         </button>
         <button 
           onClick={toggleLike} 
-          className={`p-1.5 rounded border border-transparent transition-all ${isLiked ? 'text-red-500 bg-red-50' : 'text-slate-400 hover:text-red-500 hover:bg-red-50 hover:border-red-100'}`} 
+          className={`p-1.5 rounded transition-all ${isLiked ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-primary hover:bg-primary/10'}`} 
           title="点赞"
         >
           <ThumbsUp size={16} className={isLiked ? "fill-current" : ""} />
         </button>
         <button 
           onClick={toggleFavorite} 
-          className={`p-1.5 rounded border border-transparent transition-all ${isFavorited ? 'text-pink-500 bg-pink-50' : 'text-slate-400 hover:text-pink-500 hover:bg-pink-50 hover:border-pink-100'}`} 
+          className={`p-1.5 rounded transition-all ${isFavorited ? 'text-destructive bg-destructive/10' : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`} 
           title="收藏"
         >
           <Heart size={16} className={isFavorited ? "fill-current" : ""} />

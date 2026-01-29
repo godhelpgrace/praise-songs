@@ -26,70 +26,90 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 w-full max-w-md shadow-2xl">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-indigo-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-indigo-400">
-            <Music size={32} />
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-2">欢迎回来</h1>
-          <p className="text-slate-400 text-sm">登录您的赞美吧账号</p>
-        </div>
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-slate-900">
+      {/* Background Decor */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-violet-600/20 rounded-full blur-[120px]" />
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm text-center">
-              {error}
+      <div className="relative z-10 w-full max-w-md">
+        <div className="bg-white/10 backdrop-blur-2xl border border-white/20 rounded-3xl p-8 shadow-2xl">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-white shadow-lg shadow-indigo-500/30">
+              <Music size={32} />
             </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              账号
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="用户名 / 手机号 / 邮箱"
-              className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
-              value={formData.identifier}
-              onChange={(e) => setFormData({ ...formData, identifier: e.target.value })}
-            />
+            <h1 className="text-2xl font-bold text-white mb-2">欢迎回来</h1>
+            <p className="text-slate-300 text-sm">登录您的赞美吧账号</p>
           </div>
 
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-sm font-medium text-slate-300">
-                密码
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-200 px-4 py-3 rounded-xl text-sm text-center flex items-center justify-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-slate-300 ml-1">
+                账号
               </label>
-              <a href="#" className="text-xs text-indigo-400 hover:text-indigo-300">
-                忘记密码？
-              </a>
+              <div className="relative group">
+                <input
+                  type="text"
+                  required
+                  placeholder="用户名 / 手机号 / 邮箱"
+                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all group-hover:border-white/20"
+                  value={formData.identifier}
+                  onChange={(e) => setFormData({ ...formData, identifier: e.target.value })}
+                />
+              </div>
             </div>
-            <input
-              type="password"
-              required
-              placeholder="请输入密码"
-              className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            />
+
+            <div className="space-y-2">
+              <div className="flex justify-between items-center ml-1">
+                <label className="block text-sm font-medium text-slate-300">
+                  密码
+                </label>
+                <Link href="/forgot-password" className="text-xs text-indigo-300 hover:text-white transition-colors">
+                  忘记密码？
+                </Link>
+              </div>
+              <div className="relative group">
+                <input
+                  type="password"
+                  required
+                  placeholder="请输入密码"
+                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all group-hover:border-white/20"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+              {loading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>登录中...</span>
+                </div>
+              ) : (
+                '立即登录'
+              )}
+            </button>
+          </form>
+
+          <div className="mt-8 text-center text-sm text-slate-400">
+            还没有账号？
+            <Link href="/register" className="text-indigo-300 hover:text-white font-medium ml-1 transition-colors underline decoration-transparent hover:decoration-white/30 underline-offset-4">
+              立即注册
+            </Link>
           </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 rounded-xl transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? '登录中...' : '立即登录'}
-          </button>
-        </form>
-
-        <div className="mt-8 text-center text-sm text-slate-400">
-          还没有账号？
-          <Link href="/register" className="text-indigo-400 hover:text-indigo-300 font-medium ml-1">
-            立即注册
-          </Link>
         </div>
       </div>
     </div>

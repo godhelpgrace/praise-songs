@@ -1,76 +1,90 @@
-import { promises as fs } from 'fs';
-import path from 'path';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import MusicListClient from '@/components/MusicListClient';
-
-// Define project root explicitly
-const PROJECT_ROOT = path.resolve(process.cwd(), '..');
-const DB_PATH = path.join(PROJECT_ROOT, 'db.json');
+import { prisma } from '@/lib/db';
 
 async function getSongs() {
   try {
-    // Check if DB exists
-    try {
-      await fs.access(DB_PATH);
-    } catch {
-      console.error(`DB not found at ${DB_PATH}`);
-      return { songs: [], artists: [] };
-    }
-
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    const db = JSON.parse(data);
-    // Filter out songs that don't have an audio file
-    const validSongs = db.songs.filter((song: any) => song.files && song.files.audio);
-
-    // Aggregate albums from songs (implicit) and db.albums (explicit)
-    const albumMap: Record<string, any> = {};
-    
-    // 1. From songs
-    validSongs.forEach((song: any) => {
-        if (song.album && song.album !== '-') {
-            if (!albumMap[song.album]) {
-                albumMap[song.album] = { id: song.album, name: song.album, artist: song.artist };
-            }
-            // If song has image, use it as potential cover
-            if (song.files?.image && !albumMap[song.album].cover) {
-                albumMap[song.album].cover = song.files.image;
-            }
-        }
+    const songs = await prisma.song.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        artist: true,
+        album: true
+      }
     });
 
-    // 2. From explicit albums (override/enrich)
-    if (db.albums) {
-        db.albums.forEach((a: any) => {
-            if (albumMap[a.name]) {
-                albumMap[a.name] = { ...albumMap[a.name], ...a, id: a.id };
-            } else {
-                albumMap[a.name] = a;
-            }
-        });
-    }
+    const artists = await prisma.artist.findMany();
+    const albums = await prisma.album.findMany();
+    const videos = await (prisma as any).video.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      include: {
+        artist: true,
+        song: true
+      }
+    });
 
-    const allAlbums = Object.values(albumMap);
+    // Map to client types
+    const validSongs = songs.map((s: any) => {
+        let files: any = {};
+        try {
+            files = JSON.parse(s.files);
+        } catch (e) {
+            files = {};
+        }
+
+        return {
+            id: s.id,
+            title: s.title,
+            artist: s.artistName || s.artist?.name || '未知歌手',
+            album: s.albumName || s.album?.name || '-',
+            files: files
+        };
+    }).filter((s: any) => s.files && s.files.audio);
+
+    const formattedArtists = artists.map((a: any) => ({
+        id: a.id,
+        name: a.name
+    }));
+
+    const formattedAlbums = albums.map((a: any) => ({
+        id: a.id,
+        name: a.name,
+        cover: a.cover || undefined,
+        artist: a.artistName || undefined
+    }));
 
     return {
-      songs: validSongs.reverse(),
-      artists: db.artists || [],
-      albums: allAlbums
+      songs: validSongs,
+      artists: formattedArtists,
+      albums: formattedAlbums,
+      videos: (videos as any[]).map((v) => ({
+        id: v.id,
+        uuid: v.uuid,
+        title: v.title,
+        artistId: v.artistId,
+        artistName: v.artistName || v.artist?.name || '',
+        songId: v.songId,
+        songTitle: v.song?.title || null,
+        src: v.src,
+        cover: v.cover,
+        createdAt: v.createdAt?.toISOString ? v.createdAt.toISOString() : null
+      }))
     };
   } catch (e) {
-    console.error('Error reading songs list:', e);
-    return { songs: [], artists: [], albums: [] };
+    console.error('Error fetching songs:', e);
+    return { songs: [], artists: [], albums: [], videos: [] };
   }
 }
 
 export default async function Home() {
-  const { songs, artists, albums } = await getSongs();
+  const { songs, artists, albums, videos } = await getSongs();
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background transition-colors duration-300">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
-        <MusicListClient initialSongs={songs} artists={artists} albums={albums} />
+        <MusicListClient initialSongs={songs} initialVideos={videos} artists={artists} albums={albums} />
       </main>
       <Footer />
     </div>

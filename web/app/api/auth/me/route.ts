@@ -17,7 +17,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ user: null });
     }
 
-    const user = findUserById(payload.id);
+    const user = await findUserById(payload.id);
 
     if (!user) {
       return NextResponse.json({ user: null });

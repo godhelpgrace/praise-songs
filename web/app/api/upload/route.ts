@@ -1,167 +1,184 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir, readFile } from 'fs/promises';
+import { getAuthUser, checkPermission, unauthorizedResponse, forbiddenResponse } from '@/lib/permission-check';
+import { writeFile, mkdir, unlink } from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import pinyin from 'tiny-pinyin';
+import { prisma } from '@/lib/db';
 
-// Helper to get current date path parts
-const getDatePath = () => {
-  const now = new Date();
-  const year = now.getFullYear().toString();
-  const month = (now.getMonth() + 1).toString().padStart(2, '0');
-  const day = now.getDate().toString().padStart(2, '0');
-  return { year, month, day };
+const STORAGE_ROOT = process.env.STORAGE_PATH || path.join(process.cwd(), '..', 'storage');
+
+const sanitizeFolderName = (value: string) => {
+  const cleaned = (value || '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
+  return cleaned.length > 0 ? cleaned : 'default';
 };
 
-// Mock DB Path
-const DB_PATH = path.join(process.cwd(), '..', 'db.json');
+const sanitizeFileName = (value: string) => {
+  const base = path.basename(value || '');
+  const cleaned = base
+    .replace(/[\0\/\\]/g, '_')
+    .replace(/[%?#]/g, '_')
+    .replace(/^\.+/, '')
+    .trim()
+    .slice(0, 180);
+  return cleaned.length > 0 ? cleaned : 'file';
+};
 
-// Initialize DB if not exists
-async function initDB() {
+const isErrorWithCode = (value: unknown): value is { code?: unknown } => {
+  return typeof value === 'object' && value !== null && 'code' in value;
+};
+
+const parseJsonObject = (value: string): Record<string, unknown> => {
   try {
-    await readFile(DB_PATH);
-  } catch (error) {
-    await writeFile(DB_PATH, JSON.stringify({ songs: [], albums: [], artists: [] }, null, 2));
-  }
-}
-
-// Generate ID from name
-function generateId(name: string) {
-    if (pinyin.isSupported()) {
-        const py = pinyin.convertToPinyin(name, '', true); // true for no tone, separator ''
-        return py.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const parsed: unknown = JSON.parse(value);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
     }
-    // Fallback if pinyin not supported or English
-    return name.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
+    return {};
+  } catch {
+    return {};
+  }
+};
+
+const normalizeTitle = (title: string) => {
+  return title
+    .replace(/\.[^/.]+$/, "") // Remove extension if present
+    .replace(/\s*[\(\[\{（【].*?[\)\]\}）】]$/, "") // Remove trailing content in brackets (including Chinese brackets)
+    .trim();
+};
+
+// Helper to save file
+const saveFile = async (
+  file: File,
+  type: 'audio' | 'images' | 'lrc' | 'sheets',
+  groupId: string,
+  writtenFilePaths: string[]
+) => {
+  if (!(file instanceof File) || file.size === 0) return null;
+  
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const dir = path.join(STORAGE_ROOT, type, sanitizeFolderName(groupId));
+  await mkdir(dir, { recursive: true });
+  
+  const fileName = sanitizeFileName(file.name);
+  const parsed = path.parse(fileName);
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const candidate =
+      attempt === 0
+        ? fileName
+        : `${parsed.name}_${Date.now()}_${attempt}${parsed.ext}`;
+    const filePath = path.join(dir, candidate);
+
+    try {
+      await writeFile(filePath, buffer, { flag: 'wx' });
+      writtenFilePaths.push(filePath);
+      return `/${type}/${sanitizeFolderName(groupId)}/${candidate}`;
+    } catch (e: unknown) {
+      if (isErrorWithCode(e) && e.code === 'EEXIST') continue;
+      throw e;
+    }
+  }
+
+  throw new Error('Failed to save file');
+};
 
 export async function POST(request: NextRequest) {
-  await initDB();
-  
+  const user = await getAuthUser();
+  if (!user) return unauthorizedResponse();
+
+  const canUpload = await checkPermission(user.id, 'upload', null);
+  if (!canUpload) return forbiddenResponse('You do not have permission to upload');
+
+  const writtenFilePaths: string[] = [];
   try {
     const formData = await request.formData();
-    const title = formData.get('title') as string;
-    const artistName = formData.get('artist') as string;
-    const albumName = formData.get('album') as string;
-    const category = formData.get('category') as string;
-    const releaseDate = formData.get('releaseDate') as string;
-    const description = formData.get('description') as string;
-    const genre = formData.get('genre') as string;
-    const language = formData.get('language') as string;
+    const title = ((formData.get('title') as string) || '').trim();
+    const artistName = ((formData.get('artist') as string) || '').trim() || '未知歌手'; // Default to 'Unknown' if empty
+    const albumName = ((formData.get('album') as string) || '').trim();
+    const category = ((formData.get('category') as string) || '').trim();
+    const releaseDate = ((formData.get('releaseDate') as string) || '').trim();
+    const description = ((formData.get('description') as string) || '').trim();
+    const genre = ((formData.get('genre') as string) || '').trim();
+    const language = ((formData.get('language') as string) || '').trim();
+    const force = formData.get('force') === 'true';
     
     const audioFile = formData.get('audioFile') as File;
     const imageFile = formData.get('imageFile') as File;
     const lrcFiles = formData.getAll('lrcFile') as File[];
     const sheetFiles = formData.getAll('sheetFile') as File[];
 
-    if (!title || !artistName) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!title) {
+      return NextResponse.json({ error: 'Missing required fields: title' }, { status: 400 });
     }
 
-    const dbContent = JSON.parse(await readFile(DB_PATH, 'utf-8'));
-    if (!dbContent.artists) dbContent.artists = [];
-    if (!dbContent.albums) dbContent.albums = [];
-    if (!dbContent.songs) dbContent.songs = [];
+    // Check for existing song (Title + Artist + Album)
+    // Normalize the input title for comparison
+    const normalizedInputTitle = normalizeTitle(title);
     
-    // 1. Handle Artist
-    let artistId = '';
-    let artistEntry = dbContent.artists.find((a: any) => a.name === artistName);
-    if (!artistEntry) {
-        // Create new artist
-        let baseId = generateId(artistName);
-        if (!baseId) baseId = uuidv4().substring(0, 8);
-        
-        // Ensure unique ID
-        let uniqueId = baseId;
-        let counter = 1;
-        while (dbContent.artists.find((a: any) => a.id === uniqueId)) {
-            uniqueId = `${baseId}_${counter++}`;
-        }
-        artistId = uniqueId;
+    // Find candidates by artist and album (if provided)
+    const candidates = await prisma.song.findMany({
+      where: {
+        artistName: artistName,
+        albumName: albumName || null
+      }
+    });
 
-        const firstChar = artistName.charAt(0);
-        let index = '#';
-        if (pinyin.isSupported()) {
-             const py = pinyin.convertToPinyin(firstChar, '', true);
-             const firstLetter = py.charAt(0).toUpperCase();
-             if (/^[A-Z]$/.test(firstLetter)) index = firstLetter;
+    // Find a match by comparing normalized titles
+    const existingSong = candidates.find(s => normalizeTitle(s.title) === normalizedInputTitle);
+
+    if (existingSong && !force) {
+        const files = parseJsonObject(existingSong.files);
+
+        const conflicts: string[] = [];
+        const uploadedTypes: string[] = [];
+
+        if (audioFile) {
+            uploadedTypes.push('audio');
+            if (files['audio']) conflicts.push('audio');
+        }
+        if (sheetFiles && sheetFiles.length > 0) {
+            uploadedTypes.push('sheet');
+            const sheets = files['sheets'];
+            if ((Array.isArray(sheets) && sheets.length > 0) || files['sheet']) conflicts.push('sheet');
+        }
+        if (lrcFiles && lrcFiles.length > 0) {
+            uploadedTypes.push('lrc');
+            const lrcs = files['lrcs'];
+            if ((Array.isArray(lrcs) && lrcs.length > 0) || files['lrc']) conflicts.push('lrc');
+        }
+        if (imageFile) {
+            uploadedTypes.push('image');
+            if (files['image']) conflicts.push('image');
         }
 
-        artistEntry = {
-            id: artistId,
-            name: artistName,
-            index: index
-        };
-        dbContent.artists.push(artistEntry);
-    } else {
-        artistId = artistEntry.id;
+        return NextResponse.json({ 
+            status: 'conflict', 
+            message: 'Song already exists',
+            conflicts,
+            uploadedTypes,
+            existingSong: {
+                id: existingSong.id,
+                title: existingSong.title,
+                artist: existingSong.artistName
+            }
+        }, { status: 409 });
     }
 
-    // 2. Handle Album
-    let albumId = '';
-    if (albumName) {
-        let albumEntry = dbContent.albums.find((a: any) => a.name === albumName && a.artist_id === artistId);
-        if (!albumEntry) {
-             // Create new album
-            const uuid = uuidv4().replace(/-/g, '').substring(0, 24);
-            albumEntry = {
-                id: Date.now().toString(),
-                uuid,
-                name: albumName,
-                artist: artistName,
-                artist_id: artistId,
-                release_date: releaseDate || new Date().toISOString().split('T')[0],
-                description: description || '',
-                genre: genre || '',
-                language: language || '',
-                cover: '/images/default_cover.png', // Default cover
-                songs: [], // Will store song IDs
-                created_at: new Date().toISOString()
-            };
-            dbContent.albums.push(albumEntry);
-        } else {
-            // Update existing album metadata if provided
-            if (description) albumEntry.description = description;
-            if (genre) albumEntry.genre = genre;
-            if (language) albumEntry.language = language;
-            if (releaseDate) albumEntry.release_date = releaseDate;
-        }
-        albumId = albumEntry.id;
-    }
-
-    // Prepare storage paths
-    const storageRoot = path.join(process.cwd(), '..', 'storage');
-    
-    const songId = Date.now().toString(); 
-    const uuid = uuidv4().replace(/-/g, '').substring(0, 24); 
-    
-    const savedFiles: Record<string, any> = {};
-
-    // Helper to save file
-    const saveFile = async (file: File, type: 'audio' | 'images' | 'lrc' | 'sheets') => {
-      if (!file || file.size === 0) return null;
-      
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const dir = path.join(storageRoot, type);
-      await mkdir(dir, { recursive: true });
-      
-      const fileName = file.name;
-      const filePath = path.join(dir, fileName);
-      
-      await writeFile(filePath, buffer);
-      return `/${type}/${fileName}`;
-    };
+    const songUuid = existingSong?.uuid || uuidv4().replace(/-/g, '').substring(0, 24);
 
     // Save all files
-    if (audioFile) savedFiles.audio = await saveFile(audioFile, 'audio');
-    if (imageFile) savedFiles.image = await saveFile(imageFile, 'images');
+    const savedFiles: Record<string, unknown> = {};
+
+    if (audioFile) savedFiles.audio = await saveFile(audioFile, 'audio', songUuid, writtenFilePaths);
+    if (imageFile) savedFiles.image = await saveFile(imageFile, 'images', songUuid, writtenFilePaths);
     
     // Save multiple LRCs
     if (lrcFiles && lrcFiles.length > 0) {
         const savedLrcs = [];
         for (const f of lrcFiles) {
              if (f instanceof File) {
-                const path = await saveFile(f, 'lrc');
+                const path = await saveFile(f, 'lrc', songUuid, writtenFilePaths);
                 if (path) savedLrcs.push(path);
              }
         }
@@ -176,7 +193,7 @@ export async function POST(request: NextRequest) {
         const savedSheets = [];
         for (const f of sheetFiles) {
              if (f instanceof File) {
-                const path = await saveFile(f, 'sheets');
+                const path = await saveFile(f, 'sheets', songUuid, writtenFilePaths);
                 if (path) savedSheets.push(path);
              }
         }
@@ -186,86 +203,151 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    // If album has no cover but we uploaded an image, update album cover
-    if (albumId && savedFiles.image) {
-         const albumEntry = dbContent.albums.find((a: any) => a.id === albumId);
-         if (albumEntry && (!albumEntry.cover || albumEntry.cover.includes('default_cover'))) {
-             albumEntry.cover = savedFiles.image;
-         }
-    }
+    const resultSong = await prisma.$transaction(async (tx) => {
+      let artistEntry = await tx.artist.findFirst({
+        where: { name: artistName }
+      });
 
-    // Check for existing song (Title + Artist + Album)
-    let existingSongIndex = -1;
-    dbContent.songs.some((song: any, index: number) => {
-      const metaMatch = song.title === title && 
-                       song.artist === artistName && 
-                       (song.album || '') === (albumName || '');
-      if (metaMatch) existingSongIndex = index;
-      return metaMatch;
-    });
+      if (!artistEntry) {
+        const firstChar = artistName.charAt(0);
+        let index = '#';
+        if (pinyin.isSupported()) {
+          const py = pinyin.convertToPinyin(firstChar, '', true);
+          const firstLetter = py.charAt(0).toUpperCase();
+          if (/^[A-Z]$/.test(firstLetter)) index = firstLetter;
+        }
 
-    // Update or Create Song
-    let resultSong;
-    if (existingSongIndex !== -1) {
-        // Update existing song
-        const existingSong = dbContent.songs[existingSongIndex];
-        
-        // Merge files
-        if (!existingSong.files) existingSong.files = {};
-        if (savedFiles.audio) existingSong.files.audio = savedFiles.audio;
-        if (savedFiles.image) existingSong.files.image = savedFiles.image;
-        
+        artistEntry = await tx.artist.create({
+          data: {
+            name: artistName,
+            index: index
+          }
+        });
+      }
+
+      const artistId = artistEntry.id;
+
+      let albumId: string | null = null;
+
+      if (albumName) {
+        let albumEntry = await tx.album.findFirst({
+          where: {
+            name: albumName,
+            artistId: artistId
+          }
+        });
+
+        if (!albumEntry) {
+          albumEntry = await tx.album.create({
+            data: {
+              name: albumName,
+              artistId: artistId,
+              artistName: artistName,
+              releaseDate: releaseDate || new Date().toISOString().split('T')[0],
+              description: description || '',
+              genre: genre || '',
+              language: language || '',
+              cover: '/images/default_cover.png'
+            }
+          });
+        } else {
+          const updateData: { description?: string; genre?: string; language?: string; releaseDate?: string } = {};
+          if (description) updateData.description = description;
+          if (genre) updateData.genre = genre;
+          if (language) updateData.language = language;
+          if (releaseDate) updateData.releaseDate = releaseDate;
+
+          if (Object.keys(updateData).length > 0) {
+            await tx.album.update({
+              where: { id: albumEntry.id },
+              data: updateData
+            });
+          }
+        }
+
+        albumId = albumEntry.id;
+
+        if (savedFiles.image) {
+          const refreshed = await tx.album.findUnique({ where: { id: albumId } });
+          if (refreshed && (!refreshed.cover || refreshed.cover.includes('default_cover'))) {
+            await tx.album.update({
+              where: { id: albumId },
+              data: { cover: savedFiles.image }
+            });
+          }
+        }
+      }
+
+      if (existingSong) {
+        const song = await tx.song.findUnique({ where: { id: existingSong.id } });
+        if (!song) {
+          throw new Error('Song not found');
+        }
+
+        const currentFiles: Record<string, unknown> = parseJsonObject(song.files);
+
+        if (savedFiles.audio) currentFiles['audio'] = savedFiles.audio;
+        if (savedFiles.image) currentFiles['image'] = savedFiles.image;
+
         if (savedFiles.lrcs) {
-            existingSong.files.lrcs = savedFiles.lrcs;
-            existingSong.files.lrc = savedFiles.lrc;
+          const existingLrcs = (currentFiles['lrcs'] as string[]) || [];
+          const newLrcs = savedFiles.lrcs as string[];
+          const mergedLrcs = Array.from(new Set([...existingLrcs, ...newLrcs]));
+          currentFiles['lrcs'] = mergedLrcs;
+          
+          // Always update the default lrc to the latest one
+          currentFiles['lrc'] = savedFiles.lrc;
         }
-        
+
         if (savedFiles.sheets) {
-            existingSong.files.sheets = savedFiles.sheets;
-            existingSong.files.sheet = savedFiles.sheet;
+          const existingSheets = (currentFiles['sheets'] as string[]) || [];
+          const newSheets = savedFiles.sheets as string[];
+          const mergedSheets = Array.from(new Set([...existingSheets, ...newSheets]));
+          currentFiles['sheets'] = mergedSheets;
+          
+          // Always update the default sheet to the latest one
+          currentFiles['sheet'] = savedFiles.sheet;
         }
-        
-        // Update metadata links
-        existingSong.artist_id = artistId;
-        if (albumId) existingSong.album_id = albumId;
-        if (category) existingSong.category = category;
 
-        existingSong.updated_at = new Date().toISOString();
-        
-        dbContent.songs[existingSongIndex] = existingSong;
-        resultSong = existingSong;
-    } else {
-        // Create new song
-        const newSong = {
-          id: songId,
-          uuid,
-          title,
-          artist: artistName,
-          artist_id: artistId,
-          album: albumName,
-          album_id: albumId || null,
-          category: category || '简谱',
-          created_at: new Date().toISOString(),
-          files: savedFiles
-        };
-        dbContent.songs.push(newSong);
-        resultSong = newSong;
-    }
+        if (category) currentFiles['category'] = category;
 
-    // Link Song to Album
-    if (albumId && resultSong) {
-        const albumEntry = dbContent.albums.find((a: any) => a.id === albumId);
-        if (albumEntry && !albumEntry.songs.includes(resultSong.id)) {
-            albumEntry.songs.push(resultSong.id);
+        return tx.song.update({
+          where: { id: song.id },
+          data: {
+            title: normalizedInputTitle,
+            uuid: song.uuid || songUuid,
+            files: JSON.stringify(currentFiles),
+            artistId: artistId,
+            artistName: artistName,
+            albumId: albumId,
+            albumName: albumName || null
+          }
+        });
+      }
+
+      const filesJson = {
+        ...savedFiles,
+        category: category || '简谱'
+      };
+
+      return tx.song.create({
+        data: {
+          title: normalizedInputTitle,
+          uuid: songUuid,
+          artistId,
+          artistName,
+          albumId: albumId,
+          albumName: albumName || null,
+          files: JSON.stringify(filesJson)
         }
-    }
-    
-    await writeFile(DB_PATH, JSON.stringify(dbContent, null, 2));
+      });
+    });
 
     return NextResponse.json({ success: true, data: resultSong });
 
   } catch (error) {
     console.error('Upload error:', error);
+    await Promise.allSettled(writtenFilePaths.map((p) => unlink(p)));
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

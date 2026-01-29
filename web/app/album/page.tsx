@@ -1,13 +1,10 @@
-import { promises as fs } from 'fs';
-import path from 'path';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import Link from 'next/link';
 import { Disc, PlayCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const PROJECT_ROOT = path.resolve(process.cwd(), '..');
-const DB_PATH = path.join(PROJECT_ROOT, 'db.json');
+import { prisma } from '@/lib/db';
+import AlbumCover from '@/components/AlbumCover';
 
 const FILTER_TYPES = ['全部', '全长专辑', '单曲EP', '现场Live', '精选集', '原创集', '伴奏集', '诗歌本', '经文诗歌', '有声读物'];
 const FILTER_GENRES = ['全部', '古典/传统', '现代流行', '乡村民谣', '中国风', '器乐/纯音乐', 'R&B/Hip-Hop', '戏曲', '爵士/布鲁斯', '以色列', '舞曲/电子', '古风', '其它'];
@@ -24,48 +21,27 @@ type Album = {
   songCount: number;
 };
 
-async function getAlbums() {
+async function getAlbums(): Promise<Album[]> {
   try {
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    const db = JSON.parse(data);
-    const songs = db.songs.filter((song: any) => song.album);
-    
-    const albumMap: Record<string, Album> = {};
-
-    // 1. Initialize from explicit albums
-    if (db.albums) {
-        db.albums.forEach((a: any) => {
-            albumMap[a.name] = {
-                name: a.name,
-                artist: a.artist || '未知歌手',
-                cover: a.cover,
-                genre: a.genre,
-                language: a.language,
-                type: '全长专辑', // Default to album if explicitly defined
-                songCount: 0 // Will count from songs
-            };
-        });
-    }
-
-    // 2. Add songs to albums and count
-    songs.forEach((song: any) => {
-        const albumName = song.album;
-        if (!albumMap[albumName]) {
-            albumMap[albumName] = {
-                name: albumName,
-                artist: song.artist || '未知歌手',
-                cover: song.files.image, // Fallback to song image
-                songCount: 0,
-                type: '全长专辑'
-            };
-        } else if (!albumMap[albumName].cover && song.files.image) {
-            albumMap[albumName].cover = song.files.image;
+    const albums = await prisma.album.findMany({
+      include: {
+        _count: {
+          select: { songs: true }
         }
-        albumMap[albumName].songCount++;
+      }
     });
 
-    return Object.values(albumMap);
+    return albums.map((a: any) => ({
+        name: a.name,
+        artist: a.artistName || '未知歌手',
+        cover: a.cover || '',
+        genre: a.genre || undefined,
+        language: a.language || undefined,
+        type: a.type || '全长专辑',
+        songCount: a._count.songs
+    }));
   } catch (e) {
+    console.error(e);
     return [];
   }
 }
@@ -73,8 +49,8 @@ async function getAlbums() {
 function FilterSection({ title, options, current, paramKey, searchParams }: { title: string, options: string[], current: string, paramKey: string, searchParams: Record<string, string | string[] | undefined> }) {
     return (
         <div className="mb-8">
-            <h3 className="font-bold text-slate-800 mb-3 border-l-4 border-amber-500 pl-3 text-base">{title}</h3>
-            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600">
+            <h3 className="font-bold text-foreground mb-3 border-l-4 border-primary pl-3 text-base">{title}</h3>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
                 {options.map(opt => {
                     const isActive = current === opt || (opt === '全部' && !current);
                     
@@ -101,8 +77,8 @@ function FilterSection({ title, options, current, paramKey, searchParams }: { ti
                             key={opt} 
                             href={`/album?${newParams.toString()}`}
                             className={cn(
-                                "hover:text-amber-600 transition-colors",
-                                isActive ? "text-amber-600 font-bold" : ""
+                                "hover:text-primary transition-colors",
+                                isActive ? "text-primary font-bold" : ""
                             )}
                         >
                             {opt}
@@ -141,34 +117,34 @@ export default async function AlbumPage({ searchParams }: { searchParams: Promis
   filteredAlbums.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className="min-h-screen flex flex-col bg-background">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
+        <div className="flex flex-col gap-8">
             
             {/* Main Content Area */}
             <div className="flex-1">
-                <div className="bg-white rounded-xl p-6 shadow-sm min-h-[500px]">
-                    <div className="flex justify-between items-center mb-6 pb-2 border-b border-slate-100">
-                        <h2 className="text-xl font-bold text-slate-800">最新入库专辑</h2>
-                        <span className="text-xs text-slate-400 hover:text-amber-500 cursor-pointer">更多 &raquo;</span>
+                <div className="bg-card/50 backdrop-blur-xl rounded-xl p-6 shadow-xl border border-border min-h-[500px]">
+                    <div className="flex justify-between items-center mb-6 pb-2 border-b border-border">
+                        <h2 className="text-xl font-bold text-foreground">最新入库专辑</h2>
+                        <span className="text-xs text-muted-foreground hover:text-primary cursor-pointer transition-colors">更多 &raquo;</span>
                     </div>
 
                     {filteredAlbums.length === 0 ? (
-                        <div className="text-center py-20 text-slate-400">
+                        <div className="text-center py-20 text-muted-foreground">
                             <Disc size={48} className="mx-auto mb-4 opacity-50" />
                             <p>没有找到相关专辑</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                             {filteredAlbums.map((album) => (
                                 <Link 
                                     href={`/album/${encodeURIComponent(album.name)}`} 
                                     key={album.name} 
                                     className="group block"
                                 >
-                                    <div className="relative aspect-square mb-3 overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-shadow">
-                                        <img 
+                                    <div className="relative aspect-square mb-3 overflow-hidden rounded-lg shadow-lg shadow-black/5 dark:shadow-black/20 group-hover:shadow-primary/20 transition-all">
+                                        <AlbumCover 
                                             src={
                                                 (!album.cover || album.cover.includes('default_cover'))
                                                 ? '/images/default_cover.png'
@@ -177,14 +153,14 @@ export default async function AlbumPage({ searchParams }: { searchParams: Promis
                                             alt={album.name} 
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                         />
-                                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <PlayCircle className="text-white w-10 h-10 drop-shadow-lg transform scale-90 group-hover:scale-100 transition-transform" />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                                            <PlayCircle className="text-white w-12 h-12 drop-shadow-lg transform scale-90 group-hover:scale-100 transition-transform" />
                                         </div>
                                     </div>
-                                    <h3 className="text-sm font-bold text-slate-800 truncate mb-1 group-hover:text-amber-600 transition-colors" title={album.name}>
+                                    <h3 className="text-sm font-bold text-foreground truncate mb-1 group-hover:text-primary transition-colors" title={album.name}>
                                         {album.name}
                                     </h3>
-                                    <p className="text-xs text-slate-500 truncate">
+                                    <p className="text-xs text-muted-foreground truncate group-hover:text-foreground transition-colors">
                                         {album.artist}
                                     </p>
                                 </Link>
@@ -193,51 +169,6 @@ export default async function AlbumPage({ searchParams }: { searchParams: Promis
                     )}
                 </div>
             </div>
-
-            {/* Sidebar Filters */}
-            <aside className="w-full lg:w-64 shrink-0 space-y-8">
-                <FilterSection title="类型" options={FILTER_TYPES} current={currentType} paramKey="type" searchParams={params} />
-                <FilterSection title="流派" options={FILTER_GENRES} current={currentGenre} paramKey="genre" searchParams={params} />
-                <FilterSection title="语言" options={FILTER_LANGUAGES} current={currentLanguage} paramKey="language" searchParams={params} />
-                <div className="mb-8">
-                    <h3 className="font-bold text-slate-800 mb-3 border-l-4 border-amber-500 pl-3 text-base">首字母</h3>
-                    <div className="flex flex-wrap gap-2 text-xs text-slate-600 font-medium">
-                        {FILTER_INITIALS.map(opt => {
-                             const isActive = currentInitial === opt || (opt === '全部' && !currentInitial);
-                             
-                             const newParams = new URLSearchParams();
-                             Object.entries(params).forEach(([key, value]) => {
-                                 if (value) {
-                                     if (Array.isArray(value)) {
-                                         value.forEach(v => newParams.append(key, v));
-                                     } else {
-                                         newParams.set(key, value);
-                                     }
-                                 }
-                             });
-
-                             if (opt === '全部') {
-                                 newParams.delete('initial');
-                             } else {
-                                 newParams.set('initial', opt);
-                             }
-
-                             return (
-                                <Link 
-                                    key={opt} 
-                                    href={`/album?${newParams.toString()}`}
-                                    className={cn(
-                                        "w-6 h-6 flex items-center justify-center rounded hover:bg-amber-100 hover:text-amber-600 transition-colors",
-                                        isActive ? "bg-amber-500 text-white hover:bg-amber-600 hover:text-white" : "bg-slate-100"
-                                    )}
-                                >
-                                    {opt}
-                                </Link>
-                             );
-                        })}
-                    </div>
-                </div>
-            </aside>
 
         </div>
       </main>

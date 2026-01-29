@@ -1,37 +1,60 @@
-import { promises as fs } from 'fs';
-import path from 'path';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import PlaylistDetailClient from './client';
 import { notFound } from 'next/navigation';
-
-const PROJECT_ROOT = path.resolve(process.cwd(), '..');
-const DB_PATH = path.join(PROJECT_ROOT, 'db.json');
+import { prisma } from '@/lib/db';
 
 async function getData(id: string) {
   try {
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    const db = JSON.parse(data);
-    const playlist = db.playlists?.find((p: any) => p.id === id);
-    const allSongs = db.songs || [];
-    
-    if (playlist && playlist.songs) {
-        // Hydrate songs if they are IDs
-        playlist.songs = playlist.songs.map((item: any) => {
-            if (typeof item === 'string') {
-                return allSongs.find((s: any) => s.id === item);
-            }
-            // If it's already an object (legacy data), try to find updated version by ID
-            if (item && item.id) {
-                const updated = allSongs.find((s: any) => s.id === item.id);
-                return updated || item;
-            }
-            return item;
-        }).filter(Boolean); // Remove nulls if song not found
-    }
+    const playlist = await prisma.playlist.findUnique({
+      where: { id },
+      include: {
+        songs: true
+      }
+    });
 
-    return { playlist, allSongs };
+    const allSongs = await prisma.song.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!playlist) return { playlist: null, allSongs: [] };
+
+    // Format playlist songs
+    const formattedPlaylist = {
+        ...playlist,
+        created_at: playlist.createdAt.toISOString(),
+        cover: playlist.cover ?? undefined,
+        description: playlist.description ?? undefined,
+        songs: playlist.songs.map((s: any) => {
+            let files = {};
+            try { files = JSON.parse(s.files); } catch {}
+            return {
+                id: s.id,
+                title: s.title,
+                artist: s.artistName || '未知歌手',
+                album: s.albumName || '-',
+                files
+            };
+        }),
+        tags: playlist.tags ? playlist.tags.split(',') : []
+    };
+
+    // Format all songs
+    const formattedAllSongs = allSongs.map((s: any) => {
+        let files = {};
+        try { files = JSON.parse(s.files); } catch {}
+        return {
+            id: s.id,
+            title: s.title,
+            artist: s.artistName || '未知歌手',
+            album: s.albumName || '-',
+            files
+        };
+    });
+
+    return { playlist: formattedPlaylist, allSongs: formattedAllSongs };
   } catch (e) {
+    console.error(e);
     return { playlist: null, allSongs: [] };
   }
 }
@@ -47,12 +70,12 @@ export default async function PlaylistDetailPage({ params }: { params: Promise<{
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
         {/* Breadcrumb */}
-        <div className="text-sm text-gray-500 mb-6 flex items-center gap-2">
-          <a href="/" className="hover:text-orange-500">首页</a> &gt; <a href="/playlist" className="hover:text-orange-500">歌单</a> &gt; <span className="text-gray-800">{playlist.title}</span>
+        <div className="text-sm text-muted-foreground mb-6 flex items-center gap-2">
+          <a href="/" className="hover:text-primary transition-colors">首页</a> &gt; <a href="/playlist" className="hover:text-primary transition-colors">歌单</a> &gt; <span className="text-foreground">{playlist.title}</span>
         </div>
         
         <PlaylistDetailClient playlist={playlist} allSongs={allSongs} />

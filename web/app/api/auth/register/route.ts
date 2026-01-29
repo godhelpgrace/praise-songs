@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     }
 
     // Check if user exists
-    if (checkUserConflict(username, email, phone)) {
+    if (await checkUserConflict(username, email, phone)) {
       return NextResponse.json({ error: '用户名、邮箱或手机号已被注册' }, { status: 400 });
     }
 
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       created_at: new Date().toISOString()
     };
 
-    createUser(newUser);
+    await createUser(newUser);
 
     // No auto login, require manual login
     return NextResponse.json({ success: true });

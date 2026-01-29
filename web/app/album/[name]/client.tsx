@@ -6,11 +6,14 @@ import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import MusicListClient from '@/components/MusicListClient';
 
+const DEFAULT_COVER = '/images/default_cover.png';
+
 type Album = {
     name: string;
     artist: string;
     cover?: string;
     songs: any[];
+    songsCount?: number;
     otherAlbums: any[];
 };
 
@@ -80,12 +83,12 @@ export default function AlbumDetailClient({ album }: { album: Album }) {
         const top = (window.screen.availHeight - height) / 2;
         
         const lastHeartbeat = parseInt(localStorage.getItem('music_player_heartbeat') || '0');
-        const isActive = localStorage.getItem('music_player_active') === 'true' && (Date.now() - lastHeartbeat < 2000);
+        const isActive = localStorage.getItem('music_player_active') === 'true' && (Date.now() - lastHeartbeat < 5000);
 
         const playerSongs = album.songs.map(s => ({
             id: s.id,
             title: s.title,
-            artist: s.artist,
+            artist: s.artistName || s.artist || 'Unknown',
             cover: s.files?.image ? `/api/file${s.files.image}` : undefined,
             src: s.files?.audio ? `/api/file${s.files.audio}` : undefined,
             lrcPath: s.files?.lrc ? `/api/file${s.files.lrc}` : undefined
@@ -115,7 +118,7 @@ export default function AlbumDetailClient({ album }: { album: Album }) {
     };
 
     const handleDelete = async () => {
-        if (!confirm(`确定要删除专辑 "${album.name}" 吗？\n这将清除所有相关歌曲的专辑信息，但不会删除歌曲文件。`)) return;
+        if (!confirm(`确定要删除专辑 "${album.name}" 吗？\n这将删除专辑内所有歌曲及其文件，且不可恢复。`)) return;
 
         try {
             const res = await fetch(`/api/album/${encodeURIComponent(album.name)}`, {
@@ -135,32 +138,32 @@ export default function AlbumDetailClient({ album }: { album: Album }) {
     return (
         <div className="min-h-screen flex flex-col">
             <main className="flex-1 container mx-auto px-4 py-8">
-                <Link href="/album" className="inline-flex items-center gap-1 text-gray-500 hover:text-blue-600 mb-6 text-sm">
+                <Link href="/album" className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary mb-6 text-sm transition-colors">
                     <ArrowLeft size={16} />
                     返回专辑列表
                 </Link>
 
                 {/* Album Info Header */}
-                <div className="bg-white/80 backdrop-blur-md p-6 rounded-lg shadow-sm mb-6 flex flex-col md:flex-row gap-8 border border-white/60">
+                <div className="bg-card backdrop-blur-xl p-6 rounded-lg shadow-xl mb-6 flex flex-col md:flex-row gap-8 border border-border">
                     <div 
-                        className="w-64 h-64 bg-gray-100/50 rounded-md flex-shrink-0 overflow-hidden shadow-md flex items-center justify-center border border-gray-200 relative group cursor-pointer"
+                        className="w-64 h-64 bg-muted rounded-md flex-shrink-0 overflow-hidden shadow-lg flex items-center justify-center border border-border relative group cursor-pointer"
                         onClick={handleCoverClick}
                         title="点击更换封面"
                     >
-                        {album.cover ? (
-                            <img 
-                                src={`/api/file${album.cover}`} 
-                                alt={album.name} 
-                                className="w-full h-full object-cover"
-                            />
-                        ) : (
-                            <div className="text-gray-300">
-                                <Disc size={80} />
-                            </div>
-                        )}
+                        <img 
+                            src={album.cover ? `/api/file${album.cover}` : DEFAULT_COVER} 
+                            alt={album.name} 
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                if (target.src !== window.location.origin + DEFAULT_COVER) {
+                                    target.src = DEFAULT_COVER;
+                                }
+                            }}
+                        />
                         
                         {/* Hover Overlay */}
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center flex-col gap-2 text-white">
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center flex-col gap-2 text-white backdrop-blur-[2px]">
                             <Camera size={32} />
                             <span className="text-sm font-medium">更换封面</span>
                         </div>
@@ -174,81 +177,81 @@ export default function AlbumDetailClient({ album }: { album: Album }) {
                         />
 
                         {/* CD Effect */}
-                        <div className="absolute top-0 right-0 bottom-0 w-4 bg-gradient-to-l from-black/10 to-transparent pointer-events-none"></div>
+                        <div className="absolute top-0 right-0 bottom-0 w-4 bg-gradient-to-l from-black/20 to-transparent pointer-events-none"></div>
                     </div>
                     
                     <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2 group/title">
-                            <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded">专辑</span>
+                            <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded shadow-lg shadow-primary/20">专辑</span>
                             {isEditing ? (
                                 <div className="flex items-center gap-2">
                                     <input 
                                         type="text" 
                                         value={newName} 
                                         onChange={(e) => setNewName(e.target.value)}
-                                        className="border border-gray-300 rounded px-2 py-1 text-2xl font-bold"
+                                        className="bg-muted border border-border text-foreground rounded px-2 py-1 text-2xl font-bold focus:outline-none focus:border-primary"
                                         autoFocus
                                     />
-                                    <button onClick={handleRename} className="text-green-600 hover:bg-green-50 p-1 rounded"><Check size={20} /></button>
-                                    <button onClick={() => setIsEditing(false)} className="text-gray-400 hover:bg-gray-100 p-1 rounded"><X size={20} /></button>
+                                    <button onClick={handleRename} className="text-green-500 hover:bg-green-500/10 p-1 rounded"><Check size={20} /></button>
+                                    <button onClick={() => setIsEditing(false)} className="text-muted-foreground hover:bg-muted p-1 rounded"><X size={20} /></button>
                                 </div>
                             ) : (
-                                <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+                                <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
                                     {album.name}
-                                    <button onClick={() => setIsEditing(true)} className="opacity-0 group-hover/title:opacity-100 transition-opacity text-gray-400 hover:text-orange-500 p-1">
+                                    <button onClick={() => setIsEditing(true)} className="opacity-0 group-hover/title:opacity-100 transition-opacity text-muted-foreground hover:text-primary p-1">
                                         <Edit2 size={16} />
                                     </button>
                                 </h1>
                             )}
                         </div>
-                        <p className="text-gray-500 text-sm mb-4 italic">/ 一句话描述这张专辑的特色...</p>
+                        <p className="text-muted-foreground text-sm mb-4 italic">/ 一句话描述这张专辑的特色...</p>
 
-                        <div className="grid grid-cols-2 gap-y-2 text-sm text-gray-600 mb-6 max-w-md">
+                        <div className="grid grid-cols-2 gap-y-2 text-sm text-muted-foreground mb-6 max-w-md">
                              <div className="flex gap-2">
-                                <span className="text-gray-400">音乐人：</span>
-                                <span className="text-blue-600 hover:underline cursor-pointer">{album.artist}</span>
+                                <span className="text-muted-foreground">音乐人：</span>
+                                <span className="text-primary hover:underline cursor-pointer">{album.artist}</span>
                              </div>
                              <div className="flex gap-2">
-                                <span className="text-gray-400">歌曲数量：</span>
-                                <span>{album.songs.length} 首</span>
+                                <span className="text-muted-foreground">歌曲数量：</span>
+                                <span>{album.songsCount || 0} 首</span>
                              </div>
                              <div className="flex gap-2">
-                                <span className="text-gray-400">专辑类型：</span>
+                                <span className="text-muted-foreground">专辑类型：</span>
                                 <span>全长专辑</span>
                              </div>
                              <div className="flex gap-2">
-                                <span className="text-gray-400">发行日期：</span>
+                                <span className="text-muted-foreground">发行日期：</span>
                                 <span>2023-01-01</span>
                              </div>
                              <div className="flex gap-2">
-                                <span className="text-gray-400">专辑语言：</span>
+                                <span className="text-muted-foreground">专辑语言：</span>
                                 <span>国语</span>
                              </div>
                               <div className="flex gap-2">
-                                <span className="text-gray-400">专辑流派：</span>
+                                <span className="text-muted-foreground">专辑流派：</span>
                                 <span>现代流行</span>
                              </div>
                         </div>
 
-                        <div className="text-sm text-gray-600 leading-relaxed mb-6 line-clamp-3">
+                        <div className="text-sm text-muted-foreground leading-relaxed mb-6 line-clamp-3">
                             专辑简介：这是一张非常优秀的赞美诗专辑，收录了多首感人至深的敬拜歌曲，带领人进入神的同在...
                         </div>
                         
                         <div className="flex gap-3">
                             <button 
                                 onClick={handlePlayAll}
-                                className="bg-blue-600 text-white px-6 py-2 rounded text-sm hover:bg-blue-700 flex items-center gap-2 transition-colors"
+                                className="bg-primary text-primary-foreground px-6 py-2 rounded-lg text-sm hover:bg-primary/90 flex items-center gap-2 transition-all shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 font-bold"
                             >
                                 <PlayCircle size={18} />
                                 播放全部
                             </button>
-                            <button className="border border-gray-300 text-gray-600 px-6 py-2 rounded text-sm hover:bg-gray-50 transition-colors flex items-center gap-2">
+                            <button className="border border-border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2">
                                 <Heart size={16} /> 收藏
                             </button>
-                            <button className="border border-gray-300 text-gray-600 px-6 py-2 rounded text-sm hover:bg-gray-50 transition-colors flex items-center gap-2">
+                            <button className="border border-border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2">
                                 <Share2 size={16} /> 分享
                             </button>
-                            <button onClick={handleDelete} className="border border-gray-200 text-red-500 px-6 py-2 rounded text-sm hover:bg-red-50 transition-colors flex items-center gap-2 ml-auto">
+                            <button onClick={handleDelete} className="border border-border bg-muted/50 hover:bg-destructive/20 text-muted-foreground hover:text-destructive hover:border-destructive/30 px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 ml-auto">
                                 <Trash2 size={16} /> 删除专辑
                             </button>
                         </div>
@@ -258,9 +261,9 @@ export default function AlbumDetailClient({ album }: { album: Album }) {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Main Content: Songs */}
                     <div className="lg:col-span-2 space-y-6">
-                         <div className="bg-white/80 backdrop-blur-md rounded-lg shadow-sm overflow-hidden border border-white/60">
-                             <div className="px-6 py-3 border-b border-gray-100/50 flex justify-between items-center">
-                                <h2 className="text-lg font-bold text-gray-800 border-l-4 border-blue-600 pl-3">专辑曲目</h2>
+                         <div className="bg-card backdrop-blur-xl rounded-2xl shadow-xl overflow-hidden border border-border">
+                             <div className="px-6 py-4 border-b border-border flex justify-between items-center">
+                                <h2 className="text-lg font-bold text-foreground border-l-4 border-primary pl-3">专辑曲目</h2>
                              </div>
                              <MusicListClient initialSongs={album.songs} hideArtist={true} hideAlbum={true} />
                         </div>
@@ -268,25 +271,30 @@ export default function AlbumDetailClient({ album }: { album: Album }) {
 
                     {/* Sidebar: Other Albums */}
                     <div className="space-y-6">
-                         <div className="bg-white/80 backdrop-blur-md rounded-lg shadow-sm overflow-hidden p-4 border border-white/60">
+                         <div className="bg-card backdrop-blur-xl rounded-2xl shadow-xl overflow-hidden p-4 border border-border">
                              <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-lg font-bold text-gray-800 border-l-4 border-blue-600 pl-3">音乐人其他专辑</h2>
-                                <Link href="#" className="text-xs text-gray-400 hover:text-blue-600">更多 &raquo;</Link>
+                                <h2 className="text-lg font-bold text-foreground border-l-4 border-primary pl-3">音乐人其他专辑</h2>
+                                <Link href="#" className="text-xs text-muted-foreground hover:text-primary">更多 &raquo;</Link>
                              </div>
-                             <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
-                                {album.otherAlbums.map((a: any) => (
-                                     <Link href={`/album/${encodeURIComponent(a.name)}`} key={a.name} className="group">
-                                        <div className="aspect-square bg-gray-100 rounded overflow-hidden mb-2 relative">
-                                            {a.cover ? (
-                                                <img src={`/api/file${a.cover}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                                            ) : (
-                                                <div className="flex items-center justify-center h-full text-gray-300"><Disc size={24}/></div>
-                                            )}
+                             <div className="grid grid-cols-2 gap-3">
+                               {album.otherAlbums.map((a: any) => (
+                                    <Link href={`/album/${encodeURIComponent(a.name)}`} key={a.name} className="group">
+                                       <div className="aspect-square bg-muted rounded-xl overflow-hidden mb-2 relative shadow-lg border border-border">
+                                            <img 
+                                                src={a.cover ? `/api/file${a.cover}` : DEFAULT_COVER} 
+                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                                onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    if (target.src !== window.location.origin + DEFAULT_COVER) {
+                                                        target.src = DEFAULT_COVER;
+                                                    }
+                                                }}
+                                            />
                                         </div>
-                                        <div className="text-sm font-medium text-gray-800 truncate group-hover:text-blue-600">{a.name}</div>
+                                        <div className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{a.name}</div>
                                     </Link>
                                 ))}
-                                {album.otherAlbums.length === 0 && <div className="text-xs text-gray-400 col-span-2 text-center py-4">暂无其他专辑</div>}
+                                {album.otherAlbums.length === 0 && <div className="text-xs text-muted-foreground col-span-2 text-center py-4">暂无其他专辑</div>}
                              </div>
                          </div>
                     </div>
