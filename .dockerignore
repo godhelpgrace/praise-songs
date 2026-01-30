@@ -1,0 +1,12 @@
+Dockerfile
+.dockerignore
+.git
+.gitignore
+README.md
+docker-compose.yml
+node_modules
+web/node_modules
+web/.next
+data
+.env
+.DS_Store

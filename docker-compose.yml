@@ -7,8 +7,10 @@ services:
       dockerfile: Dockerfile
     container_name: zanmei-web
     restart: always
-    ports:
-      - "3000:3000"
+    # ports:
+    #   - "3000:3000"
+    expose:
+      - "3000"
     environment:
       - DATABASE_URL=file:/app/db/dev.db
       - STORAGE_PATH=/app/storage
@@ -17,3 +19,25 @@ services:
       - ./data/db:/app/db
       # Persist uploaded files
       - ./data/storage:/app/storage
+
+  nginx:
+    image: nginx:alpine
+    container_name: zanmei-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    depends_on:
+      - web
+
+  certbot:
+    image: certbot/certbot
+    container_name: zanmei-certbot
+    volumes:
+      - ./data/certbot/conf:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait ${!}; done;'"

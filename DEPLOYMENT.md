@@ -90,6 +90,162 @@ docker-compose logs -f
 
 如果一切正常，访问 `http://服务器IP:3000` 即可看到运行中的爱赞美网站。
 
+## 🔒 HTTPS 部署 (Nginx + Certbot)
+
+为了生产环境的安全，建议使用 Nginx 反向代理并配置 SSL 证书。我们提供了自动化脚本来帮助你完成配置。
+
+### 1. 准备配置
+
+在项目根目录下创建 `nginx` 目录，并新建 `nginx/nginx.conf` 文件：
+
+```nginx
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    server_tokens off;
+    client_max_body_size 20M;
+    gzip on;
+
+    upstream web_upstream {
+        server web:3000;
+    }
+
+    server {
+        listen 80;
+        server_name example.com; # 请修改为你的域名
+
+        location /.well-known/acme-challenge/ {
+            root /var/www/certbot;
+        }
+
+        location / {
+            return 301 https://$host$request_uri;
+        }
+    }
+
+    server {
+        listen 443 ssl;
+        server_name example.com; # 请修改为你的域名
+
+        ssl_certificate /etc/letsencrypt/live/example.com/fullchain.pem; # 修改域名
+        ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem; # 修改域名
+        
+        include /etc/letsencrypt/options-ssl-nginx.conf;
+        ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+        location / {
+            proxy_pass http://web_upstream;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}
+```
+
+### 2. 初始化证书
+
+在项目根目录下创建 `init-letsencrypt.sh` 脚本，并**修改其中的 `domains` 和 `email` 变量**：
+
+```bash
+#!/bin/bash
+
+if ! [ -x "$(command -v docker-compose)" ]; then
+  echo 'Error: docker-compose is not installed.' >&2
+  exit 1
+fi
+
+domains=(example.com) # 修改为你的域名
+rsa_key_size=4096
+data_path="./data/certbot"
+email="" # 修改为你的邮箱
+staging=0 # 测试时设为 1，正式使用设为 0
+
+if [ -d "$data_path" ]; then
+  read -p "Existing data found for $domains. Continue and replace existing certificate? (y/N) " decision
+  if [ "$decision" != "Y" ] && [ "$decision" != "y" ]; then
+    exit
+  fi
+fi
+
+if [ ! -e "$data_path/conf/options-ssl-nginx.conf" ] || [ ! -e "$data_path/conf/ssl-dhparams.pem" ]; then
+  echo "### Downloading recommended TLS parameters ..."
+  mkdir -p "$data_path/conf"
+  curl -s https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf > "$data_path/conf/options-ssl-nginx.conf"
+  curl -s https://raw.githubusercontent.com/certbot/certbot/master/certbot/certbot/ssl-dhparams.pem > "$data_path/conf/ssl-dhparams.pem"
+  echo
+fi
+
+echo "### Creating dummy certificate for $domains ..."
+path="/etc/letsencrypt/live/$domains"
+mkdir -p "$data_path/conf/live/$domains"
+docker-compose run --rm --entrypoint "\
+  openssl req -x509 -nodes -newkey rsa:$rsa_key_size -days 1\
+    -keyout '$path/privkey.pem' \
+    -out '$path/fullchain.pem' \
+    -subj '/CN=localhost'" certbot
+echo
+
+echo "### Starting nginx ..."
+docker-compose up --force-recreate -d nginx
+echo
+
+echo "### Deleting dummy certificate for $domains ..."
+docker-compose run --rm --entrypoint "\
+  rm -Rf /etc/letsencrypt/live/$domains && \
+  rm -Rf /etc/letsencrypt/archive/$domains && \
+  rm -Rf /etc/letsencrypt/renewal/$domains.conf" certbot
+echo
+
+echo "### Requesting Let's Encrypt certificate for $domains ..."
+#Join $domains to -d args
+domain_args=""
+for domain in "${domains[@]}"; do
+  domain_args="$domain_args -d $domain"
+done
+
+# Select appropriate email arg
+case "$email" in
+  "") email_arg="--register-unsafely-without-email" ;;
+  *) email_arg="-m $email" ;;
+esac
+
+# Enable staging mode if needed
+if [ $staging != "0" ]; then staging_arg="--staging"; fi
+
+docker-compose run --rm --entrypoint "\
+  certbot certonly --webroot -w /var/www/certbot \
+    $staging_arg \
+    $email_arg \
+    $domain_args \
+    --rsa-key-size $rsa_key_size \
+    --agree-tos \
+    --force-renewal" certbot
+echo
+
+echo "### Reloading nginx ..."
+docker-compose exec nginx nginx -s reload
+```
+
+### 3. 执行部署
+
+```bash
+# 添加执行权限
+chmod +x init-letsencrypt.sh
+
+# 运行初始化脚本
+./init-letsencrypt.sh
+
+# 启动所有服务
+docker-compose up -d
+```
+
 ## ⚙️ 高级配置
 
 ### 端口修改
